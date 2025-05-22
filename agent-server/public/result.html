@@ -13,30 +13,60 @@
     h1 {
       margin-bottom: 20px;
     }
+
+    /* 🏠 고정 홈 버튼 */
+    #homeButton {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 1000;
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(200, 200, 200, 0.4);
+      padding: 8px 14px;
+      border-radius: 10px;
+      font-weight: 600;
+      color: #333;
+      text-decoration: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      transition: all 0.2s ease-in-out;
+    }
+
+    #homeButton:hover {
+      background: rgba(255, 255, 255, 0.9);
+      box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+    }
+
     table {
       width: 100%;
       border-collapse: collapse;
       margin-top: 20px;
     }
+
     th, td {
       padding: 8px;
       border: 1px solid #ccc;
       text-align: center;
     }
+
     th {
       background-color: #f3f3f3;
     }
+
     .status {
       font-weight: bold;
     }
+
     .양호 { color: green; }
     .취약 { color: red; }
     .미점검 { color: gray; }
     .점검중 { color: orange; }
+
     button {
       padding: 4px 8px;
       margin: 2px;
     }
+
     .modal {
       display: none;
       position: fixed;
@@ -45,6 +75,7 @@
       width: 100%; height: 100%;
       background-color: rgba(0,0,0,0.5);
     }
+
     .modal-content {
       background-color: white;
       margin: 15% auto;
@@ -57,6 +88,7 @@
   </style>
 </head>
 <body>
+  <a href="/index.html" id="homeButton">🏠 홈으로</a>
   <h1>🧪 점검 항목 목록</h1>
   <p id="templateInfo">템플릿 정보를 불러오는 중...</p>
   <button onclick="runAllChecks()" style="margin-top: 10px;">🔁 전체 점검</button>
@@ -166,10 +198,8 @@
                   statusEl.title = updated.detail;
                 }
 
-                // ✅ 서비스 상태 갱신
                 document.getElementById(`service-${id}`).textContent = updated.service_status || 'N/A';
 
-                // ✅ 액션 버튼 갱신
                 const actionCell = document.getElementById(`action-${id}`);
                 actionCell.innerHTML = `
                   <button onclick="runCheck(${id}, '${vulnid}', '${hostname}')">점검</button>
@@ -189,7 +219,7 @@
       fetch(`/api/template/by-id/${getQueryParam("templateid")}`)
         .then(res => res.json())
         .then(data => {
-          const delay = 1500; // 1.5초 간격
+          const delay = 1500;
           data.forEach((row, index) => {
             setTimeout(() => {
               runCheck(row.id, row.vulnid, row.hostname);
