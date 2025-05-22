@@ -29,20 +29,30 @@
     .status {
       font-weight: bold;
     }
-    .양호 {
-      color: green;
-    }
-    .취약 {
-      color: red;
-    }
-    .미점검 {
-      color: gray;
-    }
-    .점검중 {
-      color: orange;
-    }
+    .양호 { color: green; }
+    .취약 { color: red; }
+    .미점검 { color: gray; }
+    .점검중 { color: orange; }
     button {
       padding: 4px 8px;
+      margin: 2px;
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 10;
+      left: 0; top: 0;
+      width: 100%; height: 100%;
+      background-color: rgba(0,0,0,0.5);
+    }
+    .modal-content {
+      background-color: white;
+      margin: 15% auto;
+      padding: 20px;
+      width: 80%;
+      max-width: 600px;
+      border-radius: 8px;
+      white-space: pre-wrap;
     }
   </style>
 </head>
@@ -61,6 +71,10 @@
     </thead>
     <tbody></tbody>
   </table>
+
+  <div id="detailModal" class="modal">
+    <div class="modal-content" id="detailContent"></div>
+  </div>
 
   <script>
     function getQueryParam(param) {
@@ -89,14 +103,15 @@
 
           data.forEach(row => {
             const resultClass = getStatusClass(row.result);
-            const detailTooltip = row.detail ? `title="${row.detail}"` : '';
-
             const tr = document.createElement('tr');
             tr.innerHTML = `
               <td>${row.vulnid}</td>
               <td>${row.vulname}</td>
-              <td class="status ${resultClass}" id="status-${row.id}" ${detailTooltip}>${row.result}</td>
-              <td><button onclick="runCheck(${row.id}, '${row.vulnid}', '${row.hostname}')">점검</button></td>
+              <td class="status ${resultClass}" id="status-${row.id}" title="${row.detail || ''}">${row.result}</td>
+              <td>
+                <button onclick="runCheck(${row.id}, '${row.vulnid}', '${row.hostname}')">점검</button>
+                ${row.detail ? `<button onclick="showDetail(\`${row.detail.replace(/`/g, '\\`')}\`)">상세</button>` : ''}
+              </td>
             `;
             tbody.appendChild(tr);
           });
@@ -146,6 +161,18 @@
         statusCell.className = "status";
         console.error(err);
       });
+    }
+
+    function showDetail(detailText) {
+      document.getElementById("detailContent").textContent = detailText;
+      document.getElementById("detailModal").style.display = "block";
+    }
+
+    window.onclick = function(event) {
+      const modal = document.getElementById("detailModal");
+      if (event.target === modal) {
+        modal.style.display = "none";
+      }
     }
   </script>
 </body>
