@@ -32,23 +32,24 @@ app.post('/api/template', async (req, res) => {
     hostName,
     ip,
     result,
-    assessYN
+    assessYN,
+    risk_grade = 3
   } = req.body;
 
   try {
     await pool.query(`
       INSERT INTO evaluation_results (
         templateid, templatename, item_id,
-        host_name, result, risk_level, risk_score, vuln_score,
+        host_name, result, risk_level, risk_score, vuln_score, risk_grade,
         checked_by_agent, last_checked_at, detail
       ) VALUES (
         $1, $2, $3,
-        $4, $5, '중', 50, 10,
+        $4, $5, '중', 50, 10, $6,
         false, null, null
       )
     `, [
       templateid, templatename, vulnid,
-      hostName, result || '미점검'
+      hostName, result || '미점검', risk_grade
     ]);
     res.sendStatus(200);
   } catch (err) {
@@ -67,9 +68,9 @@ app.post('/api/template/save', async (req, res) => {
       await client.query(
         `INSERT INTO evaluation_results (
           templateid, templatename, host_name, item_id,
-          result, risk_level, risk_score, vuln_score,
+          result, risk_level, risk_score, vuln_score, risk_grade,
           checked_by_agent, last_checked_at
-        ) VALUES ($1, $2, $3, $4, '미점검', $5, $6, $7, false, null)`,
+        ) VALUES ($1, $2, $3, $4, '미점검', $5, $6, $7, $8, false, null)`,
         [
           templateid,
           templatename,
@@ -77,7 +78,8 @@ app.post('/api/template/save', async (req, res) => {
           item.id,
           item.risk_level,
           item.risk_score,
-          item.vuln_score
+          item.vuln_score,
+          item.risk_grade || 3
         ]
       );
     }
@@ -92,7 +94,7 @@ app.post('/api/template/save', async (req, res) => {
   }
 });
 
-// 템플릿 항목 조회 (JOIN template_items for vulname)
+// 템플릿 항목 조회 (JOIN template_items for vulname, vul_info)
 app.get('/api/template/by-id/:templateid', async (req, res) => {
   try {
     const result = await pool.query(
@@ -103,10 +105,12 @@ app.get('/api/template/by-id/:templateid', async (req, res) => {
          r.host_name AS hostname,
          t.item_id AS vulnid,
          t.item_name AS vulname,
+         t.vul_info,
          r.result,
          r.risk_level,
          r.risk_score,
          r.vuln_score,
+         r.risk_grade,
          r.checked_by_agent,
          r.last_checked_at,
          r.detail,
