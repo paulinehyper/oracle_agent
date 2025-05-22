@@ -213,6 +213,8 @@ app.get('/api/template/summary/all', async (req, res) => {
   }
 });
 
+
+
 // 템플릿 목록 조회
 app.get('/api/template/list', async (req, res) => {
   try {
@@ -227,6 +229,21 @@ app.get('/api/template/list', async (req, res) => {
     res.status(500).send('템플릿 목록 조회 실패');
   }
 });
+
+app.get('/api/templates', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT DISTINCT templateid, templatename, host_name AS hostname
+       FROM evaluation_results
+       ORDER BY templateid DESC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('❌ /api/templates DB 조회 실패:', err.message);
+    res.status(500).json({ error: err.message || 'DB 조회 실패' });
+  }
+});
+
 
 // 헬스 체크
 app.get('/health', (req, res) => {

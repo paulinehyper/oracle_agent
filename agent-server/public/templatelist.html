@@ -6,87 +6,91 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      padding: 20px;
+      padding: 40px;
       max-width: 1000px;
       margin: auto;
+      background-color: #f9fafb;
     }
     h1 {
-      margin-bottom: 20px;
+      text-align: center;
+      margin-bottom: 30px;
     }
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 20px;
     }
     th, td {
-      padding: 8px 12px;
-      border: 1px solid #ccc;
-      text-align: left;
+      border: 1px solid #ddd;
+      padding: 10px;
+      text-align: center;
     }
     th {
-      background-color: #f3f3f3;
+      background-color: #f1f3f5;
     }
-    #status {
-      margin-top: 10px;
+    tr:hover {
+      background-color: #f0f8ff;
+    }
+    a {
+      text-decoration: none;
+      color: #007BFF;
       font-weight: bold;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    #backButton {
+      display: inline-block;
+      margin-bottom: 20px;
+      background: #555;
+      color: white;
+      padding: 8px 14px;
+      border-radius: 8px;
+      text-decoration: none;
     }
   </style>
 </head>
 <body>
-  <h1>📋 등록된 템플릿 목록</h1>
+  <a href="/index.html" id="backButton">🏠 홈으로</a>
+  <h1>📋 저장된 점검 템플릿 목록</h1>
 
-  <div id="status">⏳ 불러오는 중...</div>
-  <table id="templateTable" style="display:none;">
+  <table id="templateTable">
     <thead>
       <tr>
-        <th>ID</th>
-        <th>Vuln ID</th>
-        <th>Server Name</th>
-        <th>Host Name</th>
+        <th>템플릿 ID</th>
+        <th>템플릿 이름</th>
+        <th>호스트명</th>
         <th>IP</th>
-        <th>Vuln Name</th>
-        <th>Result</th>
-        <th>Assess</th>
-        <th>Create Time</th>
+        <th>이동</th>
       </tr>
     </thead>
     <tbody></tbody>
   </table>
 
   <script>
-    fetch('/api/template/list')
+    fetch('/api/templates')
       .then(res => res.json())
       .then(data => {
-        const table = document.getElementById('templateTable');
-        const tbody = table.querySelector('tbody');
-        const status = document.getElementById('status');
-
+        const tbody = document.querySelector('#templateTable tbody');
         if (data.length === 0) {
-          status.textContent = "📭 등록된 템플릿이 없습니다.";
+          tbody.innerHTML = '<tr><td colspan="5">⚠️ 템플릿이 없습니다.</td></tr>';
           return;
         }
 
         data.forEach(row => {
           const tr = document.createElement('tr');
           tr.innerHTML = `
-            <td>${row.id}</td>
-            <td>${row.vulnid}</td>
-            <td>${row.servername}</td>
+            <td>${row.templateid}</td>
+            <td>${row.templatename}</td>
             <td>${row.hostname}</td>
-            <td>${row.ip}</td>
-            <td>${row.vulname}</td>
-            <td>${row.result}</td>
-            <td>${row.assessyn}</td>
-            <td>${row.createtime}</td>
+            <td>${row.ip || 'N/A'}</td>
+            <td><a href="/result.html?templateid=${row.templateid}">🔍 보기</a></td>
           `;
           tbody.appendChild(tr);
         });
-
-        status.style.display = 'none';
-        table.style.display = 'table';
       })
       .catch(err => {
-        document.getElementById('status').textContent = "❌ 데이터 불러오기 실패: " + err;
+        document.querySelector('#templateTable tbody').innerHTML =
+          `<tr><td colspan="5">❌ 템플릿 불러오기 실패: ${err}</td></tr>`;
       });
   </script>
 </body>

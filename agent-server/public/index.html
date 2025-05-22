@@ -1,92 +1,100 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <title>에이전트 보안 점검</title>
+  <meta charset="UTF-8">
+  <title>보안 점검 시스템 홈</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      padding: 20px;
-      max-width: 800px;
-      margin: auto;
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f5f7fa;
     }
-    h1 {
-      margin-bottom: 20px;
+
+    header {
+      background-color: #343a40;
+      color: white;
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     }
-    .result-box {
-      margin-top: 30px;
-      border-top: 1px solid #ccc;
-      padding-top: 15px;
+
+    header h1 {
+      font-size: 1.5em;
+      margin: 0;
     }
-    .item {
-      margin-bottom: 15px;
-    }
-    button {
-      margin: 5px 10px 5px 0;
-      padding: 10px 15px;
-    }
-    label {
+
+    #resultLink {
+      background: #00b894;
+      color: white;
+      padding: 10px 16px;
+      border-radius: 8px;
       font-weight: bold;
-      margin-right: 10px;
+      text-decoration: none;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      transition: background 0.3s ease-in-out;
+    }
+
+    #resultLink:hover {
+      background: #019875;
+    }
+
+    main {
+      padding: 40px 24px;
+      text-align: center;
+    }
+
+    .action {
+      margin-top: 30px;
+    }
+
+    .action button {
+      padding: 12px 24px;
+      font-size: 16px;
+      border: none;
+      background-color: #0984e3;
+      color: white;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    .action button:hover {
+      background-color: #0652dd;
+    }
+
+    footer {
+      text-align: center;
+      color: #999;
+      margin-top: 80px;
+      font-size: 14px;
     }
   </style>
 </head>
 <body>
-  <h1>📡 서버 제어 패널</h1>
 
-  <div>
-    <label>
-      <input type="checkbox" id="ftpException" />
-      FTP 예외 (점검 생략)
-    </label>
-    <button onclick="sendCommand('ftp-check')">FTP 점검</button>
-    <button onclick="sendCommand('snmp-check')">SNMP 점검</button>
-    <button onclick="sendCommand('cpu')">CPU 점검</button>
-  </div>
+  <header>
+    <h1>🔐 보안 점검 시스템</h1>
+    <a href="/result.html?templateid=tmpl-latest" id="resultLink">📊 점검 결과 보기</a>
+  </header>
+<a href="/templatelist.html" id="resultLink">📋 템플릿 목록 보기</a>
+  <main>
+    <h2>안전한 시스템을 위한 자동 점검 플랫폼</h2>
+    <p>지금 새로운 점검을 시작하거나 최근 점검 결과를 확인하세요.</p>
 
-  <div>
-    <button onclick="location.href='/newtemplate.html'">➕ 템플릿 추가</button>
-  </div>
+    <div class="action">
+      <button onclick="location.href='/newassess.html'">➕ 새로운 점검 시작하기</button>
+    </div>
+  </main>
 
-  <div class="result-box" id="results">
-    <h2>🧾 점검 결과</h2>
-    <div id="ftp-check" class="item"><strong>FTP:</strong> ⏳ 대기 중...</div>
-    <div id="snmp-check" class="item"><strong>SNMP:</strong> ⏳ 대기 중...</div>
-    <div id="cpu" class="item"><strong>CPU:</strong> ⏳ 대기 중...</div>
-  </div>
+  <footer>
+    © 2025 보안 점검 시스템 — All rights reserved.
+  </footer>
 
-  <script>
-    function sendCommand(cmd) {
-      if (cmd === 'ftp-check' && document.getElementById('ftpException').checked) {
-        document.getElementById('ftp-check').innerHTML =
-          "<strong>FTP:</strong> ✅ 예외 처리됨 (점검 생략)";
-        return;
-      }
-
-      document.getElementById(cmd).innerHTML =
-        `<strong>${cmd.toUpperCase()}:</strong> 🕐 명령 전송 중...`;
-
-      fetch(`/send-command/${cmd}`)
-        .then(() => setTimeout(() => fetchResult(cmd), 4000));
-    }
-
-    function fetchResult(cmd) {
-      fetch('/latest-result')
-        .then(res => res.json())
-        .then(data => {
-          if (data[cmd]) {
-            document.getElementById(cmd).innerHTML =
-              `<strong>${cmd.toUpperCase()}:</strong> ${data[cmd]}`;
-          } else {
-            document.getElementById(cmd).innerHTML =
-              `<strong>${cmd.toUpperCase()}:</strong> ⏳ 결과 없음`;
-          }
-        })
-        .catch(err => {
-          document.getElementById(cmd).innerHTML =
-            `<strong>${cmd.toUpperCase()}:</strong> ❌ 오류: ${err}`;
-        });
-    }
-  </script>
 </body>
 </html>
