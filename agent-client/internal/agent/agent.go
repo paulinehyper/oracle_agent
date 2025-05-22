@@ -66,12 +66,29 @@ func performCheck(vulnid string) (string, string, string) {
 		return "미점검", "❓ 알 수 없는 항목", "N/A"
 	}
 }
+
 func checkSMTP() (string, string, string) {
-	out, err := exec.Command("sh", "-c", "ps -ef | grep -Ei 'postfix|sendmail|exim' | grep -v grep").Output()
-	if err != nil || len(out) == 0 {
-		return "양호", "SMTP 서비스가 실행되고 있지 않음 → 양호", "미사용"
+	// 검색 대상 프로세스
+	targets := []string{"sendmail", "postfix", "exim", "opensmtpd", "qmail"}
+	running := []string{}
+
+	for _, proc := range targets {
+		cmd := fmt.Sprintf("ps -ef | grep -w %s | grep -v grep", proc)
+		out, err := exec.Command("sh", "-c", cmd).Output()
+		if err == nil && len(out) > 0 {
+			running = append(running, proc)
+		}
 	}
-	return "취약", fmt.Sprintf("SMTP 서비스가 실행 중입니다:\n%s", string(out)), "SMTP 실행 중"
+
+	if len(running) == 0 {
+		return "양호", "SMTP 관련 프로세스가 실행되고 있지 않음 → 양호", "미사용"
+	}
+
+	// 실행 중인 프로세스를 나열
+	detail := fmt.Sprintf("다음 SMTP 관련 프로세스가 실행 중입니다: %s", strings.Join(running, ", "))
+	serviceStatus := fmt.Sprintf("%s 실행 중", strings.Join(running, ", "))
+
+	return "취약", detail, serviceStatus
 }
 
 func checkSNMP() (string, string, string) {
