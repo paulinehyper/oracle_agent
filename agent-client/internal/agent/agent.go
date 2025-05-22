@@ -60,9 +60,18 @@ func performCheck(vulnid string) (string, string, string) {
 	switch vulnid {
 	case "SRV-001":
 		return checkSNMP()
+	case "SRV-004":
+		return checkSMTP()
 	default:
 		return "미점검", "❓ 알 수 없는 항목", "N/A"
 	}
+}
+func checkSMTP() (string, string, string) {
+	out, err := exec.Command("sh", "-c", "ps -ef | grep -Ei 'postfix|sendmail|exim' | grep -v grep").Output()
+	if err != nil || len(out) == 0 {
+		return "양호", "SMTP 서비스가 실행되고 있지 않음 → 양호", "미사용"
+	}
+	return "취약", fmt.Sprintf("SMTP 서비스가 실행 중입니다:\n%s", string(out)), "SMTP 실행 중"
 }
 
 func checkSNMP() (string, string, string) {
