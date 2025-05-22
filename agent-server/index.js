@@ -41,11 +41,11 @@ app.post('/api/template', async (req, res) => {
       INSERT INTO evaluation_results (
         templateid, templatename, item_id,
         host_name, result, risk_level, risk_score, vuln_score, risk_grade,
-        checked_by_agent, last_checked_at, detail
+        checked_by_agent, last_checked_at, detail, service_status
       ) VALUES (
         $1, $2, $3,
         $4, $5, '중', 50, 10, $6,
-        false, null, null
+        false, null, null, null
       )
     `, [
       templateid, templatename, vulnid,
@@ -69,8 +69,8 @@ app.post('/api/template/save', async (req, res) => {
         `INSERT INTO evaluation_results (
           templateid, templatename, host_name, item_id,
           result, risk_level, risk_score, vuln_score, risk_grade,
-          checked_by_agent, last_checked_at
-        ) VALUES ($1, $2, $3, $4, '미점검', $5, $6, $7, $8, false, null)`,
+          checked_by_agent, last_checked_at, service_status
+        ) VALUES ($1, $2, $3, $4, '미점검', $5, $6, $7, $8, false, null, null)`,
         [
           templateid,
           templatename,
@@ -114,6 +114,7 @@ app.get('/api/template/by-id/:templateid', async (req, res) => {
          r.checked_by_agent,
          r.last_checked_at,
          r.detail,
+         r.service_status,
          CASE WHEN r.result = '양호' THEN r.vuln_score ELSE 0 END AS vuln_last_score
        FROM evaluation_results r
        JOIN template_items t ON r.item_id = t.item_id
@@ -130,16 +131,17 @@ app.get('/api/template/by-id/:templateid', async (req, res) => {
 
 // 점검 결과 저장
 app.post('/api/result', async (req, res) => {
-  const { host_name, item_id, result, detail } = req.body;
+  const { host_name, item_id, result, detail, service_status } = req.body;
   try {
     const updateResult = await pool.query(
       `UPDATE evaluation_results
        SET result = $1,
            detail = $2,
+           service_status = $3,
            checked_by_agent = true,
            last_checked_at = NOW()
-       WHERE host_name = $3 AND item_id = $4`,
-      [result, detail, host_name, item_id]
+       WHERE host_name = $4 AND item_id = $5`,
+      [result, detail, service_status, host_name, item_id]
     );
     if (updateResult.rowCount === 0) {
       console.warn(`⚠️ 업데이트 대상 없음: host=${host_name}, item_id=${item_id}`);

@@ -19,10 +19,11 @@ type Command struct {
 }
 
 type Result struct {
-	HostName string `json:"host_name"` // ✅ DB에서 필요
-	ItemID   string `json:"item_id"`   // ✅ DB에서 필요
-	Result   string `json:"result"`    // 양호 / 취약
-	Detail   string `json:"detail"`    // 세부 결과
+	HostName      string `json:"host_name"`
+	ItemID        string `json:"item_id"`
+	Result        string `json:"result"`
+	Detail        string `json:"detail"`
+	ServiceStatus string `json:"service_status"` // ✅ 서비스 상태 필드
 }
 
 const serverURL = "http://localhost:3000"
@@ -41,36 +42,39 @@ func Start() {
 
 		fmt.Println("🛠️ 수신된 점검 명령:", cmd)
 
-		result, detail := performCheck(cmd.VulnID)
+		result, detail, service := performCheck(cmd.VulnID)
 
 		sendResult(Result{
-			HostName: cmd.Host,
-			ItemID:   cmd.VulnID,
-			Result:   result,
-			Detail:   detail,
+			HostName:      cmd.Host,
+			ItemID:        cmd.VulnID,
+			Result:        result,
+			Detail:        detail,
+			ServiceStatus: service,
 		})
 
 		time.Sleep(2 * time.Second)
 	}
 }
 
-func performCheck(vulnid string) (string, string) {
+func performCheck(vulnid string) (string, string, string) {
 	switch vulnid {
 	case "SRV-001":
 		return checkSNMP()
 	default:
-		return "미점검", "❓ 알 수 없는 항목"
+		return "미점검", "❓ 알 수 없는 항목", "N/A"
 	}
 }
 
-func checkSNMP() (string, string) {
+func checkSNMP() (string, string, string) {
 	if !isSNMPRunning() {
-		return "양호", "SNMP 사용 여부: 미사용"
+		return "양호", "SNMP 사용 여부: 미사용", "미사용"
 	}
+
+	serviceStatus := "SNMP 실행 중"
 
 	confBytes, err := ioutil.ReadFile("/etc/snmp/snmpd.conf")
 	if err != nil {
-		return "취약", "SNMP 설정 파일 없음 또는 읽기 실패"
+		return "취약", "SNMP 설정 파일 없음 또는 읽기 실패", serviceStatus
 	}
 	conf := string(confBytes)
 
@@ -79,26 +83,24 @@ func checkSNMP() (string, string) {
 
 	if usingV3 {
 		if authPriv {
-			return "양호", "SNMP 버전: v3\nauthPriv 설정되어 있어 양호"
-		} else {
-			return "취약", "SNMP 버전: v3\n❌ authPriv 설정 없음 → 취약"
+			return "양호", "SNMP 버전: v3\nauthPriv 설정되어 있어 양호", serviceStatus
 		}
+		return "취약", "SNMP 버전: v3\n❌ authPriv 설정 없음 → 취약", serviceStatus
 	}
 
 	usingV1V2 := strings.Contains(conf, "rocommunity") || strings.Contains(conf, "rwcommunity")
 	if usingV1V2 {
 		community := extractCommunityString(conf)
 		if community == "" {
-			return "취약", "SNMP 버전: v1 또는 v2\ncommunity string 미발견 → 취약"
+			return "취약", "SNMP 버전: v1 또는 v2\ncommunity string 미발견 → 취약", serviceStatus
 		}
 		if checkCommunityStringComplexity(community) {
-			return "양호", fmt.Sprintf("SNMP 버전: v1 또는 v2\ncommunity string='%s' (복잡도 양호)", community)
-		} else {
-			return "취약", fmt.Sprintf("SNMP 버전: v1 또는 v2\ncommunity string='%s' (복잡도 취약)", community)
+			return "양호", fmt.Sprintf("SNMP 버전: v1 또는 v2\ncommunity string='%s' (복잡도 양호)", community), serviceStatus
 		}
+		return "취약", fmt.Sprintf("SNMP 버전: v1 또는 v2\ncommunity string='%s' (복잡도 취약)", community), serviceStatus
 	}
 
-	return "취약", "SNMP 사용 중이나 버전 판단 실패"
+	return "취약", "SNMP 사용 중이나 버전 판단 실패", serviceStatus
 }
 
 func isSNMPRunning() bool {

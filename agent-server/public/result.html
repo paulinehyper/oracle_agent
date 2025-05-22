@@ -68,6 +68,7 @@
         <th>위험도</th>
         <th>Result</th>
         <th>상세설명</th>
+        <th>서비스</th>
         <th>Action</th>
       </tr>
     </thead>
@@ -112,6 +113,7 @@
               <td>${renderRiskGrade(row.risk_grade)}</td>
               <td class="status ${resultClass}" id="status-${row.id}">${row.result}</td>
               <td>${row.vul_info ? row.vul_info.replace(/</g, '&lt;').replace(/>/g, '&gt;') : ''}</td>
+              <td id="service-${row.id}">${row.service_status || 'N/A'}</td>
               <td id="action-${row.id}">
                 <button onclick="runCheck(${row.id}, '${row.vulnid}', '${row.hostname}')">점검</button>
                 ${row.detail ? `<button onclick="showDetail(\`${row.detail.replace(/`/g, '\\`')}\`)">상세</button>` : ''}
@@ -163,7 +165,10 @@
                   statusEl.title = updated.detail;
                 }
 
-                // ✅ 상세 버튼도 업데이트
+                // ✅ 서비스 상태 갱신
+                document.getElementById(`service-${id}`).textContent = updated.service_status || 'N/A';
+
+                // ✅ 액션 버튼 갱신
                 const actionCell = document.getElementById(`action-${id}`);
                 actionCell.innerHTML = `
                   <button onclick="runCheck(${id}, '${vulnid}', '${hostname}')">점검</button>
