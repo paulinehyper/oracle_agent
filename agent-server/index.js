@@ -22,6 +22,7 @@ app.get('/', (req, res) => {
 });
 
 // 템플릿 항목 단건 저장
+/*
 app.post('/api/template', async (req, res) => {
   const {
     templateid,
@@ -36,6 +37,7 @@ app.post('/api/template', async (req, res) => {
     risk_grade = 3
   } = req.body;
 
+  
   try {
     await pool.query(`
       INSERT INTO evaluation_results (
@@ -57,6 +59,61 @@ app.post('/api/template', async (req, res) => {
     res.status(500).send('템플릿 저장 실패');
   }
 });
+*/
+// 템플릿 항목 단건 저장 및 자산 등록
+app.post('/api/template', async (req, res) => {
+  const {
+    templateid,
+    templatename,
+    vulnid,
+    vulName,
+    serverName,
+    hostName,
+    ip,
+    result,
+    assessYN,
+    risk_grade = 3
+  } = req.body;
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1. 자산 정보 먼저 저장 (중복 IP 무시)
+    await client.query(`
+      INSERT INTO assets (server_name, host_name, ip)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (ip) DO NOTHING
+    `, [serverName, hostName, ip]);
+
+    // 2. 템플릿 점검 항목 저장
+    await client.query(`
+      INSERT INTO evaluation_results (
+        templateid, templatename, item_id,
+        host_name, ip, result, risk_level, risk_score, vuln_score, risk_grade,
+        checked_by_agent, last_checked_at, detail, service_status
+      ) VALUES (
+        $1, $2, $3,
+        $4, $5, $6, '중', 50, 10, $7,
+        false, null, null, null
+      )
+    `, [
+      templateid, templatename, vulnid,
+      hostName, ip, result || '미점검', risk_grade
+    ]);
+
+    await client.query('COMMIT');
+    res.sendStatus(200);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('❌ 템플릿 항목 저장 실패:', err.message);
+    res.status(500).send('템플릿 저장 실패');
+  } finally {
+    client.release();
+  }
+});
+
+
 
 // 템플릿 항목 일괄 저장
 app.post('/api/template/save', async (req, res) => {
