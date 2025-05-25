@@ -79,7 +79,7 @@
         data.forEach(row => {
           const tr = document.createElement('tr');
           tr.innerHTML = `
-            <td>${row.templateid}</td>
+            <td><a href="/result.html?templateid=${row.templateid}">${row.templateid}</a></td>
             <td>${row.templatename}</td>
             <td>${row.hostname}</td>
             <td>${row.ip || 'N/A'}</td>

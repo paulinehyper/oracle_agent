@@ -38,6 +38,7 @@
       text-decoration: none;
       box-shadow: 0 4px 10px rgba(0,0,0,0.1);
       transition: background 0.3s ease-in-out;
+      margin-left: 10px;
     }
 
     #resultLink:hover {
@@ -51,6 +52,10 @@
 
     .action {
       margin-top: 30px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      align-items: center;
     }
 
     .action button {
@@ -80,15 +85,19 @@
 
   <header>
     <h1>🔐 보안 점검 시스템</h1>
-    <a href="/result.html?templateid=tmpl-latest" id="resultLink">📊 점검 결과 보기</a>
+    <div>
+      <a href="/result.html?templateid=tmpl-latest" id="resultLink">📊 점검 결과 보기</a>
+      <a href="/templatelist.html" id="resultLink">📋 템플릿 목록 보기</a>
+    </div>
   </header>
-<a href="/templatelist.html" id="resultLink">📋 템플릿 목록 보기</a>
+
   <main>
     <h2>안전한 시스템을 위한 자동 점검 플랫폼</h2>
     <p>지금 새로운 점검을 시작하거나 최근 점검 결과를 확인하세요.</p>
 
     <div class="action">
       <button onclick="location.href='/newassess.html'">➕ 새로운 점검 시작하기</button>
+      <button onclick="location.href='/newtemplate.html'">📝 새로운 템플릿 만들기</button>
     </div>
   </main>
 

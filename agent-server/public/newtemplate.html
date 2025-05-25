@@ -16,7 +16,7 @@
     label {
       font-weight: bold;
     }
-    input, button {
+    input, select, button {
       width: 100%;
       padding: 8px;
       margin: 5px 0 15px;
@@ -44,6 +44,16 @@
     <label>Template Name:</label>
     <input type="text" name="templatename" maxlength="100" required />
 
+    <label>평가 대상:</label>
+    <select name="targetType" required>
+      <option value="">-- 평가 대상을 선택하세요 --</option>
+      <option value="서버">서버</option>
+      <option value="WAS/WEB">WAS/WEB</option>
+      <option value="데이터베이스">데이터베이스</option>
+      <option value="네트워크 장비">네트워크 장비</option>
+      <option value="정보보호시스템 장비">정보보호시스템 장비</option>
+    </select>
+
     <label>Server Name:</label>
     <input type="text" name="serverName" required />
 
@@ -70,33 +80,42 @@
   <p id="status"></p>
 
   <script>
-    // 미리 정의된 점검 항목
-    const vulnData = [];
-    for (let i = 1; i <= 10; i++) {
-      const id = `SRV-${String(i).padStart(3, '0')}`;
-      vulnData.push({ vulnid: id, vulName: `임시 점검 항목 ${i}` });
+    let vulnData = [];
+
+    async function fetchVulnList(targetType = '') {
+      try {
+        const query = targetType ? `?targetType=${encodeURIComponent(targetType)}` : '';
+        const res = await fetch(`/api/vulnerability${query}`);
+        if (!res.ok) throw new Error("서버 응답 실패");
+
+        vulnData = await res.json();
+        console.log("🔥 받아온 vulnData:", vulnData);
+
+        const tbody = document.getElementById('vulnTableBody');
+        tbody.innerHTML = "";
+
+        vulnData.forEach((item, index) => {
+          console.log("🧪 item =", item);
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td class="center">
+              <input type="checkbox" name="vulnCheck" value="${index}" checked>
+            </td>
+            <td>${item.vulnid}</td>
+            <td>${item.vulname}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (err) {
+        console.error("❌ 취약점 목록 불러오기 실패:", err);
+        document.getElementById("status").textContent = "❌ 취약점 목록을 불러오지 못했습니다.";
+      }
     }
 
-    // 테이블 출력
-    const tbody = document.getElementById('vulnTableBody');
-    vulnData.forEach((item, index) => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td class="center">
-          <input type="checkbox" name="vulnCheck" value="${index}" checked>
-        </td>
-        <td>${item.vulnid}</td>
-        <td>${item.vulName}</td>
-      `;
-      tbody.appendChild(tr);
-    });
-
-    // 고유 templateid 생성
     function generateTemplateId() {
       return 'tmpl-' + Math.random().toString(36).substring(2, 10);
     }
 
-    // 제출 이벤트
     document.getElementById("templateForm").addEventListener("submit", async function (e) {
       e.preventDefault();
 
@@ -107,7 +126,13 @@
       const serverName = formData.get("serverName");
       const hostName = formData.get("hostName");
       const ip = formData.get("ip");
-      const templateid = generateTemplateId();  // 한 번 생성
+      const targetType = formData.get("targetType");
+      const templateid = generateTemplateId();
+
+      if (!targetType) {
+        document.getElementById("status").textContent = "⚠️ 평가 대상을 선택하세요.";
+        return;
+      }
 
       const selectedTemplates = checkedIndexes.map(index => {
         const i = parseInt(index);
@@ -118,6 +143,7 @@
           serverName,
           hostName,
           ip,
+          targetType,
           vulName: vulnData[i].vulName,
           result: "미점검",
           assessYN: "N"
@@ -149,6 +175,18 @@
       } else {
         document.getElementById("status").textContent = "❌ 등록 실패: 서버에 저장되지 않았습니다.";
       }
+    });
+
+    // 평가 대상 선택 시 필터링
+    document.querySelector('select[name="targetType"]').addEventListener('change', function () {
+      const targetType = this.value;
+      fetchVulnList(targetType);
+    });
+
+    // 페이지 로드시 초기값으로 불러오기
+    window.addEventListener('DOMContentLoaded', () => {
+      const defaultType = document.querySelector('select[name="targetType"]').value;
+      fetchVulnList(defaultType);
     });
   </script>
 </body>

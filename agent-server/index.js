@@ -245,6 +245,39 @@ app.get('/api/templates', async (req, res) => {
 });
 
 
+app.get('/api/vulnerability', async (req, res) => {
+  const { targetType } = req.query;
+
+  try {
+    let result;
+
+    if (targetType && targetType.trim() !== '') {
+      // 평가 대상이 명시된 경우 → 필터링
+      result = await pool.query(`
+        SELECT vul_id AS vulnid, vul_name AS vulname
+        FROM vulnerability
+        WHERE target_type = $1
+        ORDER BY vul_id
+      `, [targetType]);
+    } else {
+      // 선택 안 된 경우 → 전체 보여주기
+      result = await pool.query(`
+        SELECT vul_id AS vulnid, vul_name AS vulname
+        FROM vulnerability
+        ORDER BY vul_id
+      `);
+    }
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error('❌ vulnerability 조회 실패:', err.message);
+    res.status(500).send('DB 조회 실패');
+  }
+});
+
+
+
+
 // 헬스 체크
 app.get('/health', (req, res) => {
   res.send('✅ Server is healthy');
@@ -253,3 +286,8 @@ app.get('/health', (req, res) => {
 app.listen(port, () => {
   console.log(`✅ 서버가 http://localhost:${port} 에서 실행 중입니다`);
 });
+
+//console.log("🔥 받아온 vulnData:", vulnData);
+//vulnData.forEach((item, index) => {
+ // console.log(`🧪 item[${index}]:`, item);
+//});
