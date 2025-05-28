@@ -179,7 +179,7 @@
   <div id="successModal" class="modal">
     <div class="modal-content">
       <p id="successMessage">✅ 템플리트가 성공적으로 등록되었습니다.</p>
-      <button onclick="closeModal()">닫기</button>
+      <button onclick="resetForm(); closeModal();">닫기</button>
     </div>
   </div>
   <script>
@@ -213,12 +213,10 @@
       const res = await fetch(`/api/vulnerability?${query.toString()}`);
       const tbody = document.getElementById("vulnTableBody");
       tbody.innerHTML = "";
-
       if (!res.ok) {
         document.getElementById("status").textContent = "❌ 목록을 불러오지 못했습니다.";
         return;
       }
-
       const vulnData = await res.json();
       vulnData.forEach((item, index) => {
         const tr = document.createElement("tr");
@@ -299,6 +297,12 @@
 
     function closeModal() {
       document.getElementById('successModal').style.display = 'none';
+    }
+
+    function resetForm() {
+      document.getElementById('templateForm').reset();
+      document.getElementById('subTargets').innerHTML = '';
+      document.getElementById('vulnTableBody').innerHTML = '';
     }
   </script>
 </body>
