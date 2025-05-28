@@ -493,6 +493,22 @@ if (basisFilter) {
 });
 
 
+// 자산 등록
+app.post('/api/asset', async (req, res) => {
+  const { category, name, hostname, ip, manager } = req.body;
+  try {
+    await pool.query(
+      `INSERT INTO asset (category, name, hostname, ip, manager)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [category, name, hostname, ip, manager]
+    );
+    res.status(200).send('ok');
+  } catch (err) {
+    console.error('❌ 자산 등록 실패:', err.message);
+    res.status(500).send('error');
+  }
+});
+
 
 // 헬스 체크
 app.get('/health', (req, res) => {

@@ -64,7 +64,7 @@
 <body>
   <div class="container">
     <h2>자산 등록</h2>
-    <form>
+    <form id="assetForm">
       <label for="category">자산 분류</label>
       <select id="category" name="category" required>
         <option value="">선택하세요</option>
@@ -103,8 +103,9 @@
     </a>
   </div>
   <script>
-    // IP 입력 유효성 검사
-    document.querySelector('form').addEventListener('submit', function(e) {
+    // IP 입력 유효성 검사 및 서버로 전송
+    document.getElementById('assetForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
       const ip1 = document.getElementById('ip1').value;
       const ip2 = document.getElementById('ip2').value;
       const ip3 = document.getElementById('ip3').value;
@@ -114,7 +115,36 @@
         ipArr.some(part => part === "" || isNaN(part) || Number(part) < 0 || Number(part) > 255)
       ) {
         alert('각 IP 칸에 0~255 사이의 숫자를 입력하세요.');
-        e.preventDefault();
+        return;
+      }
+
+      const data = {
+        category: document.getElementById('category').value,
+        name: document.getElementById('name').value,
+        hostname: document.getElementById('hostname').value,
+        ip: `${ip1}.${ip2}.${ip3}.${ip4}`,
+        manager: document.getElementById('manager').value
+      };
+
+      if (!data.category || !data.name || !data.hostname || !data.ip) {
+        alert('모든 필드를 입력하세요.');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/asset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        if (res.ok) {
+          alert('자산이 등록되었습니다.');
+          document.getElementById('assetForm').reset();
+        } else {
+          alert('등록에 실패했습니다.');
+        }
+      } catch (err) {
+        alert('서버 오류가 발생했습니다.');
       }
     });
 
