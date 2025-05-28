@@ -66,57 +66,65 @@ app.post('/api/template', async (req, res) => {
 });
 */
 // 템플릿 항목 단건 저장 및 자산 등록
-app.post('/api/template', async (req, res) => {
-  const {
-    templateid,
-    templatename,
-    vulnid,
-    vulName,
-    serverName,
-    hostName,
-    ip,
-    result,
-    assessYN,
-    risk_grade = 3
-  } = req.body;
 
+// POST /api/template
+// 템플릿 저장 (자동 생성된 template_id 사용)
+app.post('/api/template', async (req, res) => {
+  const { template_name, target_type, basis_type, vulns } = req.body;
   const client = await pool.connect();
+
   try {
     await client.query('BEGIN');
 
-    // 1. 자산 정보 먼저 저장 (중복 IP 무시)
-    await client.query(`
-      INSERT INTO assets (server_name, host_name, ip)
-      VALUES ($1, $2, $3)
-      ON CONFLICT (ip) DO NOTHING
-    `, [serverName, hostName, ip]);
+    // template_id는 SERIAL로 자동 생성됨
+    const result = await client.query(
+      `INSERT INTO template (template_name, target_type, basis_type)
+       VALUES ($1, $2, $3)
+       RETURNING template_id`,
+      [template_name, target_type, basis_type]
+    );
 
-    // 2. 템플릿 점검 항목 저장
-    await client.query(`
-      INSERT INTO evaluation_results (
-        templateid, templatename, item_id,
-        host_name, ip, result, risk_level, risk_score, vuln_score, risk_grade,
-        checked_by_agent, last_checked_at, detail, service_status
-      ) VALUES (
-        $1, $2, $3,
-        $4, $5, $6, '중', 50, 10, $7,
-        false, null, null, null
-      )
-    `, [
-      templateid, templatename, vulnid,
-      hostName, ip, result || '미점검', risk_grade
-    ]);
+    const newTemplateId = result.rows[0].template_id;
+
+    for (const vuln of vulns) {
+      await client.query(
+        `INSERT INTO template_vuln (template_id, vul_id, vul_name)
+         VALUES ($1, $2, $3)`,
+        [newTemplateId, vuln.vulnid, vuln.vulname]
+      );
+    }
 
     await client.query('COMMIT');
-    res.sendStatus(200);
+    res.status(201).send('✅ 템플릿 저장 성공');
   } catch (err) {
     await client.query('ROLLBACK');
-    console.error('❌ 템플릿 항목 저장 실패:', err.message);
-    res.status(500).send('템플릿 저장 실패');
+    console.error('❌ 템플릿 저장 실패:', err);
+    res.status(500).send('❌ 서버 오류');
   } finally {
     client.release();
   }
 });
+
+
+
+app.get('/api/template/list', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT t.template_id, t.template_name, t.target_type, t.basis_type, COUNT(v.id) AS vuln_count
+      FROM template t
+      LEFT JOIN template_vuln v ON t.template_id::text = v.template_id
+      GROUP BY t.template_id, t.template_name, t.target_type, t.basis_type
+      ORDER BY t.created_at DESC
+    `);
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error('❌ 템플릿 목록 조회 실패:', err);
+    res.status(500).send('DB 조회 실패');
+  }
+});
+
+
 
 app.post('/upload', upload.single('csvfile'), (req, res) => {
   const filePath = req.file.path;
@@ -214,40 +222,28 @@ app.post('/upload', upload.single('csvfile'), (req, res) => {
 
 
 // 템플릿 항목 일괄 저장
-app.post('/api/template/save', async (req, res) => {
-  const { templateid, templatename, host_name, items } = req.body;
-  const client = await pool.connect();
+// Node.js + Express 예시
+app.post('/api/template', async (req, res) => {
+  const { templatename, targetType, basisType } = req.body;
+
   try {
-    await client.query('BEGIN');
-    for (const item of items) {
-      await client.query(
-        `INSERT INTO evaluation_results (
-          templateid, templatename, host_name, item_id,
-          result, risk_level, risk_score, vuln_score, risk_grade,
-          checked_by_agent, last_checked_at, service_status
-        ) VALUES ($1, $2, $3, $4, '미점검', $5, $6, $7, $8, false, null, null)`,
-        [
-          templateid,
-          templatename,
-          host_name,
-          item.id,
-          item.risk_level,
-          item.risk_score,
-          item.vuln_score,
-          item.risk_grade || 3
-        ]
-      );
-    }
-    await client.query('COMMIT');
-    res.json({ message: '✅ 템플릿 저장 완료' });
+    await pool.query(
+      `INSERT INTO template (template_id, template_name, target_type, basis_type)
+       VALUES ($1, $2, $3, $4)`,
+      [
+        `tmpl_${Date.now()}`,  // 간단한 ID 생성 예시
+        templatename,
+        targetType,
+        basisType.join(',')    // 배열을 문자열로 변환
+      ]
+    );
+    res.status(200).send('✅ 등록 완료');
   } catch (err) {
-    await client.query('ROLLBACK');
-    console.error('❌ 템플릿 저장 실패:', err.message);
-    res.status(500).send('템플릿 저장 실패');
-  } finally {
-    client.release();
+    console.error('❌ 템플릿 등록 실패:', err.message);
+    res.status(500).send('등록 중 오류 발생');
   }
 });
+
 
 // 템플릿 항목 조회 (JOIN template_items for vulname, vul_info)
 app.get('/api/template/by-id/:templateid', async (req, res) => {

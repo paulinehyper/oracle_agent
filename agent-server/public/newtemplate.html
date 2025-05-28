@@ -253,5 +253,45 @@
       fetchVulnList();
     });
   </script>
+
+ <script>
+  document.getElementById('templateForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const template_name = document.querySelector('input[name="templatename"]').value.trim();
+    const target_type = document.querySelector('select[name="targetType"]').value;
+    const basis_type = Array.from(document.querySelectorAll('input[name="basisType"]:checked')).map(cb => cb.value).join(',');
+
+    const vulns = Array.from(document.querySelectorAll('input[name="vulnCheck"]:checked')).map(checkbox => {
+      const row = checkbox.closest('tr');
+      return {
+        vulnid: row.children[1].textContent.trim(),
+        vulname: row.children[2].textContent.trim()
+      };
+    });
+
+    if (!template_name || !target_type || !basis_type || vulns.length === 0) {
+      document.getElementById('status').textContent = "❗ 모든 항목을 입력하세요.";
+      return;
+    }
+
+    const res = await fetch('/api/template', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ template_name, target_type, basis_type, vulns })
+    });
+
+    const status = document.getElementById('status');
+    if (res.ok) {
+      status.textContent = "✅ 등록 성공";
+      document.getElementById('templateForm').reset();
+      fetchVulnList();
+    } else {
+      status.textContent = "❌ 등록 실패";
+    }
+  });
+</script>
+
+
 </body>
 </html>
