@@ -492,7 +492,6 @@ if (basisFilter) {
   }
 });
 
-
 // 자산 등록
 app.post('/api/asset', async (req, res) => {
   const { category, name, hostname, ip, manager } = req.body;
@@ -506,6 +505,20 @@ app.post('/api/asset', async (req, res) => {
   } catch (err) {
     console.error('❌ 자산 등록 실패:', err.message);
     res.status(500).send('error');
+  }
+});
+
+// 자산 일괄 등록
+app.post('/api/asset/bulk', async (req, res) => {
+  try {
+    const { assets } = req.body;
+    if (!Array.isArray(assets)) return res.status(400).json({ error: '자산 배열이 필요합니다.' });
+    // DB에 일괄 등록 (예: MongoDB)
+    // await AssetModel.insertMany(assets);
+    // 또는 for (const asset of assets) { await AssetModel.create(asset); }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'DB 오류' });
   }
 });
 

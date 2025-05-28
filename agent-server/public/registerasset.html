@@ -148,7 +148,7 @@
       }
     });
 
-    // CSV 미리보기 및 입력란 자동 채우기
+    // CSV 미리보기 및 입력란 자동 채우기 + 다중 등록
     document.getElementById('csvFile').addEventListener('change', function(e) {
       const file = e.target.files[0];
       if (!file) return;
@@ -170,18 +170,51 @@
         html += '</table>';
         document.getElementById('csvPreview').innerHTML = html;
 
-        // 입력란 자동 채우기 (첫 번째 데이터 행)
-        if (rows.length > 1) {
+        // 여러 행이 있으면 팝업 띄우기
+        if (rows.length > 2) {
+          if (confirm(`${rows.length - 1} 행의 데이터가 있습니다. 등록하시겠습니까?`)) {
+            // 첫 행은 헤더, 나머지는 데이터
+            const header = rows[0];
+            const categoryMap = { '서버': 'server', '데이터베이스': 'database', '네트워크': 'network', '보안': 'security' };
+            const assets = [];
+            for (let i = 1; i < rows.length; i++) {
+              const data = rows[i];
+              const map = {};
+              header.forEach((h, idx) => map[h.trim()] = data[idx] ? data[idx].trim() : '');
+              assets.push({
+                category: categoryMap[map['자산분류']] || '',
+                name: map['자산이름'] || '',
+                hostname: map['호스트네임'] || '',
+                ip: map['IP주소'] || '',
+                manager: map['관리자'] || ''
+              });
+            }
+            // 서버로 일괄 등록 요청
+            fetch('/api/asset/bulk', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ assets })
+            })
+            .then(res => {
+              if (res.ok) {
+                alert('자산이 모두 등록되었습니다.');
+                document.getElementById('csvFile').value = '';
+                document.getElementById('csvPreview').innerHTML = '';
+              } else {
+                alert('일괄 등록에 실패했습니다.');
+              }
+            })
+            .catch(() => alert('서버 오류가 발생했습니다.'));
+          }
+        } else if (rows.length === 2) {
+          // 기존처럼 첫 데이터 행만 입력란에 자동 채우기
           const header = rows[0];
           const data = rows[1];
           const map = {};
           header.forEach((h, i) => map[h.trim()] = data[i] ? data[i].trim() : '');
 
-          // 필드명에 맞게 입력란 채우기
-          // 자산분류,자산이름,호스트네임,IP주소,관리자
+          const categoryMap = { '서버': 'server', '데이터베이스': 'database', '네트워크': 'network', '보안': 'security' };
           if (map['자산분류']) {
-            // select에서 value와 한글이 다르므로 변환 필요
-            const categoryMap = { '서버': 'server', '데이터베이스': 'database', '네트워크': 'network', '보안': 'security' };
             document.getElementById('category').value = categoryMap[map['자산분류']] || '';
           }
           if (map['자산이름']) document.getElementById('name').value = map['자산이름'];
