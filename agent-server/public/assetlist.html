@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>자산 목록</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f5f7fa;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 900px;
+      margin: 60px auto;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+      padding: 32px 24px;
+    }
+    h2 {
+      margin-top: 0;
+      color: #222;
+      text-align: center;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 24px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 10px;
+      text-align: center;
+    }
+    th {
+      background: #f0f0f0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>자산 목록</h2>
+    <table id="assetTable">
+      <thead>
+        <tr>
+          <th>번호</th>
+          <th>자산 분류</th>
+          <th>자산 이름</th>
+          <th>호스트네임</th>
+          <th>IP 주소</th>
+          <th>관리자</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- 데이터가 여기에 표시됩니다 -->
+      </tbody>
+    </table>
+  </div>
+  <script>
+    async function fetchAssets() {
+      try {
+        const res = await fetch('/api/asset/list');
+        if (!res.ok) throw new Error('서버 오류');
+        const assets = await res.json();
+        const tbody = document.querySelector('#assetTable tbody');
+        tbody.innerHTML = '';
+        assets.forEach((asset, idx) => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${idx + 1}</td>
+            <td>${asset.category}</td>
+            <td>${asset.name}</td>
+            <td>${asset.hostname}</td>
+            <td>${asset.ip}</td>
+            <td>${asset.manager || ''}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (err) {
+        alert('자산 목록을 불러오지 못했습니다.');
+      }
+    }
+    fetchAssets();
+  </script>
+</body>
+</html>

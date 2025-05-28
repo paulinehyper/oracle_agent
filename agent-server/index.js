@@ -509,6 +509,15 @@ app.post('/api/asset', async (req, res) => {
   }
 });
 
+// 자산 목록 조회
+app.get('/api/asset/list', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM asset ORDER BY id DESC');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).send('DB 조회 실패');
+  }
+});
 
 // 헬스 체크
 app.get('/health', (req, res) => {
