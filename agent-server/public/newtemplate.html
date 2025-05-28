@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>템플릿 일괄 추가</title>
   <style>
     body {
@@ -12,12 +12,26 @@
     }
 
     .container {
-      max-width: 1000px;
+      max-width: 1200px;
       margin: 40px auto;
       padding: 30px;
       background-color: white;
       box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
       border-radius: 12px;
+      display: flex;
+      gap: 30px;
+    }
+
+    .form-section {
+      flex: 1;
+    }
+
+    .vuln-section {
+      flex: 1.2;
+      max-height: 700px;
+      overflow-y: auto;
+      border-left: 1px solid #ddd;
+      padding-left: 20px;
     }
 
     h1 {
@@ -29,46 +43,71 @@
     label {
       font-weight: bold;
       color: #333;
-      display: block;
       margin-top: 10px;
+      display: block;
     }
 
     input[type="text"], select {
       width: 100%;
       padding: 10px;
       margin-top: 5px;
-      margin-bottom: 20px;
       border: 1px solid #ccc;
       border-radius: 6px;
       font-size: 14px;
     }
 
-    .form-row {
+    .inline-group {
       display: flex;
-      gap: 20px;
+      align-items: center;
+      gap: 10px;
     }
 
-    .form-col {
-      flex: 1;
+    .checkbox-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 5px;
     }
 
     .sub-targets-box {
       display: flex;
       flex-wrap: wrap;
       gap: 10px;
-      border: 1px solid #ccc;
+      margin-top: 10px;
       padding: 15px;
+      border: 1px solid #ccc;
       border-radius: 6px;
       background-color: #f0f6ff;
-      margin-top: 6px;
     }
 
     .sub-targets-box label {
       font-weight: normal;
     }
 
-    .sub-targets-group {
-      display: none;
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: center;
+    }
+
+    th, td {
+      padding: 10px;
+      border: 1px solid #e0e0e0;
+      font-size: 13px;
+    }
+
+    th {
+      background-color: #eaf3ff;
+      color: #0056b3;
+      position: sticky;
+      top: 0;
+      background-clip: padding-box;
+    }
+
+    .status {
+      text-align: center;
+      margin-top: 20px;
+      color: #d00;
+      font-weight: bold;
     }
 
     button {
@@ -80,98 +119,50 @@
       font-size: 16px;
       border-radius: 6px;
       cursor: pointer;
-      transition: background-color 0.3s ease;
+      margin-top: 20px;
     }
 
     button:hover {
       background-color: #0056b3;
     }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 20px;
-      text-align: center;
-    }
-
-    th, td {
-      padding: 12px;
-      border: 1px solid #e0e0e0;
-    }
-
-    th {
-      background-color: #eaf3ff;
-      color: #0056b3;
-    }
-
-    .status {
-      text-align: center;
-      margin-top: 20px;
-      color: #d00;
-      font-weight: bold;
-    }
   </style>
 </head>
 <body>
+  <h1>➕ 템플릿 일괄 추가</h1>
+
   <div class="container">
-    <h1>➕ 템플릿 일괄 추가</h1>
+    <form id="templateForm" class="form-section">
+      <label>진단 템플릿명:</label>
+      <input type="text" name="templatename" required />
 
-    <form id="templateForm">
-      <div class="form-row">
-        <div class="form-col">
-          <label>Template Name:</label>
-          <input type="text" name="templatename" required />
-
-          <label>평가 대상:</label>
-          <select name="targetType" required>
-            <option value="">-- 평가 대상을 선택하세요 --</option>
-            <option value="Server">Server</option>
-            <option value="Database">Database</option>
-            <option value="Network">Network</option>
-            <option value="Security">Security</option>
-          </select>
-
-          <label>평가기반:</label>
-          <select name="basisType">
-            <option value="">-- 전체 --</option>
-            <option value="전자금융">전자금융</option>
-            <option value="주요정보">주요정보</option>
-          </select>
-
-          <label>Server Name:</label>
-          <input type="text" name="serverName" required />
-
-          <label>Host Name:</label>
-          <input type="text" name="hostName" required />
-
-          <label>IP Address:</label>
-          <input type="text" name="ip" required />
-        </div>
-
-        <div class="form-col sub-targets-group" id="subTargets">
-          <label>하위 대상:</label>
-          <div class="sub-targets-box">
-            <label><input type="checkbox" name="subTarget" value="AIX"> AIX</label>
-            <label><input type="checkbox" name="subTarget" value="HP-UX"> HP-UX</label>
-            <label><input type="checkbox" name="subTarget" value="LINUX"> LINUX</label>
-            <label><input type="checkbox" name="subTarget" value="SOLARIS"> SOLARIS</label>
-            <label><input type="checkbox" name="subTarget" value="WIN"> WIN</label>
-            <label><input type="checkbox" name="subTarget" value="웹서비스"> 웹서비스</label>
-            <label><input type="checkbox" name="subTarget" value="Apache"> Apache</label>
-            <label><input type="checkbox" name="subTarget" value="WebtoB"> WebtoB</label>
-            <label><input type="checkbox" name="subTarget" value="IIS"> IIS</label>
-            <label><input type="checkbox" name="subTarget" value="Tomcat"> Tomcat</label>
-            <label><input type="checkbox" name="subTarget" value="JEUS"> JEUS</label>
-          </div>
-        </div>
+      <label>평가기반:</label>
+      <div class="checkbox-group">
+        <label><input type="checkbox" name="basisType" value="전자금융" checked /> 전자금융</label>
+        <label><input type="checkbox" name="basisType" value="주요정보" checked /> 주요정보</label>
       </div>
 
+      <label>평가 대상:</label>
+      <select name="targetType" required>
+        <option value="">-- 선택 --</option>
+        <option value="Server">Server</option>
+        <option value="Database">Database</option>
+        <option value="Network">Network</option>
+        <option value="Security">Security</option>
+      </select>
+
+      <div class="sub-targets-box" id="subTargets"></div>
+
+      <button type="submit">등록</button>
+      <div class="status" id="status"></div>
+    </form>
+
+    <div class="vuln-section">
       <table>
         <thead>
           <tr>
             <th>✔</th>
-            <th>Vuln ID</th>
-            <th>Vuln Name</th>
+            <th>ID</th>
+            <th>이름</th>
             <th>위험도</th>
             <th>대상</th>
             <th>기반</th>
@@ -179,25 +170,38 @@
         </thead>
         <tbody id="vulnTableBody"></tbody>
       </table>
-
-      <button type="submit">등록</button>
-    </form>
-
-    <div class="status" id="status"></div>
+    </div>
   </div>
 
   <script>
-    let vulnData = [];
+    const subTargetGroups = {
+      Server: ['AIX', 'HP-UX', 'LINUX', 'SOLARIS', 'WIN', '웹서비스', 'Apache', 'WebtoB', 'IIS', 'Tomcat', 'JEUS'],
+      Database: ['ORACLE', 'MSSQL', 'MYSQL', 'MariaDB'],
+      Network: ['Firewall', 'Router', 'Switch'],
+      Security: ['IDS', 'IPS', 'AntiVirus']
+    };
+
+    function renderSubTargets(group = '') {
+      const box = document.getElementById('subTargets');
+      box.innerHTML = '';
+      if (!group || !subTargetGroups[group]) return;
+
+      subTargetGroups[group].forEach(item => {
+        const label = document.createElement('label');
+        label.innerHTML = `<input type="checkbox" name="subTarget" value="${item}" checked /> ${item}`;
+        box.appendChild(label);
+      });
+    }
 
     async function fetchVulnList() {
       const targetType = document.querySelector('select[name="targetType"]').value;
-      const basisType = document.querySelector('select[name="basisType"]').value;
+      const basisTypes = Array.from(document.querySelectorAll('input[name="basisType"]:checked')).map(cb => cb.value);
       const subTargets = Array.from(document.querySelectorAll('input[name="subTarget"]:checked')).map(cb => cb.value);
 
       const query = new URLSearchParams();
       if (targetType) query.append('targetType', targetType);
-      if (basisType) query.append('basisFilter', basisType);
-      if (subTargets.length > 0) query.append('subTargets', subTargets.join(','));
+      if (basisTypes.length) query.append('basisFilter', basisTypes.join(','));
+      if (subTargets.length) query.append('subTargets', subTargets.join(','));
 
       const res = await fetch(`/api/vulnerability?${query.toString()}`);
       const tbody = document.getElementById("vulnTableBody");
@@ -208,7 +212,7 @@
         return;
       }
 
-      vulnData = await res.json();
+      const vulnData = await res.json();
       vulnData.forEach((item, index) => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
@@ -224,18 +228,30 @@
     }
 
     document.querySelector('select[name="targetType"]').addEventListener('change', () => {
-      const targetType = document.querySelector('select[name="targetType"]').value;
-      const subTargetsDiv = document.getElementById("subTargets");
-      subTargetsDiv.style.display = targetType === "Server" ? "block" : "none";
+      const type = document.querySelector('select[name="targetType"]').value;
+      renderSubTargets(type);
       fetchVulnList();
     });
 
-    document.querySelectorAll('input[name="subTarget"]').forEach(input => {
-      input.addEventListener('change', fetchVulnList);
+    document.addEventListener('change', e => {
+      if (e.target.name === 'subTarget') {
+        fetchVulnList();
+      }
+
+      if (e.target.name === 'basisType') {
+        const checked = document.querySelectorAll('input[name="basisType"]:checked');
+        if (checked.length === 0) {
+          alert("⚠️ 최소 하나의 평가기반은 선택되어 있어야 합니다.");
+          e.target.checked = true;
+        } else {
+          fetchVulnList();
+        }
+      }
     });
 
-    document.querySelector('select[name="basisType"]').addEventListener('change', fetchVulnList);
-    window.addEventListener('DOMContentLoaded', fetchVulnList);
+    window.addEventListener('DOMContentLoaded', () => {
+      fetchVulnList();
+    });
   </script>
 </body>
 </html>

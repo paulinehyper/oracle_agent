@@ -400,19 +400,21 @@ app.get('/api/vulnerability', async (req, res) => {
         targetMatch = row.target_type?.toLowerCase() === targetType.toLowerCase();
       }
 
-      // 평가기반 필터
-      if (basisFilter) {
-        const filters = basisFilter.split(',').map(f => f.trim());
-        if (filters.includes('전자금융') && !filters.includes('주요정보')) {
-          basisMatch = row.basis_financial === 'o';
-        } else if (!filters.includes('전자금융') && filters.includes('주요정보')) {
-          basisMatch = row.basis_critical_info === 'o';
-        } else if (filters.includes('전자금융') && filters.includes('주요정보')) {
-          basisMatch = row.basis_financial === 'o' || row.basis_critical_info === 'o';
-        } else {
-          basisMatch = false;
-        }
-      }
+if (basisFilter) {
+  const filters = basisFilter.split(',').map(f => f.trim()).filter(f => f !== '');
+
+  if (filters.length === 0) {
+    basisMatch = false; // ✅ 둘 다 체크 해제되었을 때는 아무것도 매칭 안 됨
+  } else if (filters.includes('전자금융') && !filters.includes('주요정보')) {
+    basisMatch = row.basis_financial === 'o';
+  } else if (!filters.includes('전자금융') && filters.includes('주요정보')) {
+    basisMatch = row.basis_critical_info === 'o';
+  } else if (filters.includes('전자금융') && filters.includes('주요정보')) {
+    basisMatch = row.basis_financial === 'o' || row.basis_critical_info === 'o';
+  }
+}
+
+
 
       // 하위 대상 필터
       if (subTargets) {
