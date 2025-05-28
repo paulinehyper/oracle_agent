@@ -1,18 +1,18 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>템플릿 일괄 추가</title>
   <style>
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #f0f7ff;
+      background-color: #f5f9ff;
       margin: 0;
       padding: 0;
     }
 
     .container {
-      max-width: 960px;
+      max-width: 1000px;
       margin: 40px auto;
       padding: 30px;
       background-color: white;
@@ -28,13 +28,12 @@
 
     label {
       font-weight: bold;
-      color: #003366;
+      color: #333;
       display: block;
       margin-top: 10px;
     }
 
-    input[type="text"],
-    select {
+    input[type="text"], select {
       width: 100%;
       padding: 10px;
       margin-top: 5px;
@@ -42,6 +41,34 @@
       border: 1px solid #ccc;
       border-radius: 6px;
       font-size: 14px;
+    }
+
+    .form-row {
+      display: flex;
+      gap: 20px;
+    }
+
+    .form-col {
+      flex: 1;
+    }
+
+    .sub-targets-box {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      border: 1px solid #ccc;
+      padding: 15px;
+      border-radius: 6px;
+      background-color: #f0f6ff;
+      margin-top: 6px;
+    }
+
+    .sub-targets-box label {
+      font-weight: normal;
+    }
+
+    .sub-targets-group {
+      display: none;
     }
 
     button {
@@ -70,18 +97,11 @@
     th, td {
       padding: 12px;
       border: 1px solid #e0e0e0;
-      font-size: 14px;
-      vertical-align: middle;
     }
 
     th {
       background-color: #eaf3ff;
       color: #0056b3;
-    }
-
-    input[type="checkbox"] {
-      transform: scale(1.2);
-      cursor: pointer;
     }
 
     .status {
@@ -97,40 +117,54 @@
     <h1>➕ 템플릿 일괄 추가</h1>
 
     <form id="templateForm">
-      <label>Template Name:</label>
-      <input type="text" name="templatename" maxlength="100" required />
+      <div class="form-row">
+        <div class="form-col">
+          <label>Template Name:</label>
+          <input type="text" name="templatename" required />
 
-      <label>평가 대상:</label>
-      <select name="targetType" required>
-        <option value="">-- 평가 대상을 선택하세요 --</option>
-        <option value="AIX">AIX</option>
-        <option value="HP-UX">HP-UX</option>
-        <option value="LINUX">LINUX</option>
-        <option value="SOLARIS">SOLARIS</option>
-        <option value="WIN">WIN</option>
-        <option value="웹서비스">웹서비스</option>
-        <option value="Apache">Apache</option>
-        <option value="WebtoB">WebtoB</option>
-        <option value="IIS">IIS</option>
-        <option value="Tomcat">Tomcat</option>
-        <option value="JEUS">JEUS</option>
-      </select>
+          <label>평가 대상:</label>
+          <select name="targetType" required>
+            <option value="">-- 평가 대상을 선택하세요 --</option>
+            <option value="Server">Server</option>
+            <option value="Database">Database</option>
+            <option value="Network">Network</option>
+            <option value="Security">Security</option>
+          </select>
 
-      <label>평가기반:</label>
-      <select name="basisType">
-        <option value="">-- 전체 --</option>
-        <option value="financial">전자금융</option>
-        <option value="critical">주요정보</option>
-      </select>
+          <label>평가기반:</label>
+          <select name="basisType">
+            <option value="">-- 전체 --</option>
+            <option value="전자금융">전자금융</option>
+            <option value="주요정보">주요정보</option>
+          </select>
 
-      <label>Server Name:</label>
-      <input type="text" name="serverName" required />
+          <label>Server Name:</label>
+          <input type="text" name="serverName" required />
 
-      <label>Host Name:</label>
-      <input type="text" name="hostName" required />
+          <label>Host Name:</label>
+          <input type="text" name="hostName" required />
 
-      <label>IP Address:</label>
-      <input type="text" name="ip" required />
+          <label>IP Address:</label>
+          <input type="text" name="ip" required />
+        </div>
+
+        <div class="form-col sub-targets-group" id="subTargets">
+          <label>하위 대상:</label>
+          <div class="sub-targets-box">
+            <label><input type="checkbox" name="subTarget" value="AIX"> AIX</label>
+            <label><input type="checkbox" name="subTarget" value="HP-UX"> HP-UX</label>
+            <label><input type="checkbox" name="subTarget" value="LINUX"> LINUX</label>
+            <label><input type="checkbox" name="subTarget" value="SOLARIS"> SOLARIS</label>
+            <label><input type="checkbox" name="subTarget" value="WIN"> WIN</label>
+            <label><input type="checkbox" name="subTarget" value="웹서비스"> 웹서비스</label>
+            <label><input type="checkbox" name="subTarget" value="Apache"> Apache</label>
+            <label><input type="checkbox" name="subTarget" value="WebtoB"> WebtoB</label>
+            <label><input type="checkbox" name="subTarget" value="IIS"> IIS</label>
+            <label><input type="checkbox" name="subTarget" value="Tomcat"> Tomcat</label>
+            <label><input type="checkbox" name="subTarget" value="JEUS"> JEUS</label>
+          </div>
+        </div>
+      </div>
 
       <table>
         <thead>
@@ -155,121 +189,53 @@
   <script>
     let vulnData = [];
 
-    async function fetchVulnList(targetType = '', basisType = '') {
-      try {
-        const query = new URLSearchParams();
-        if (targetType) query.append('targetType', targetType);
-        if (basisType) {
-          if (basisType === 'financial') query.append('basisFilter', '전자금융');
-          else if (basisType === 'critical') query.append('basisFilter', '주요정보');
-        }
+    async function fetchVulnList() {
+      const targetType = document.querySelector('select[name="targetType"]').value;
+      const basisType = document.querySelector('select[name="basisType"]').value;
+      const subTargets = Array.from(document.querySelectorAll('input[name="subTarget"]:checked')).map(cb => cb.value);
 
-        const res = await fetch(`/api/vulnerability?${query.toString()}`);
-        if (!res.ok) throw new Error("서버 응답 실패");
+      const query = new URLSearchParams();
+      if (targetType) query.append('targetType', targetType);
+      if (basisType) query.append('basisFilter', basisType);
+      if (subTargets.length > 0) query.append('subTargets', subTargets.join(','));
 
-        vulnData = await res.json();
-        const tbody = document.getElementById('vulnTableBody');
-        tbody.innerHTML = "";
+      const res = await fetch(`/api/vulnerability?${query.toString()}`);
+      const tbody = document.getElementById("vulnTableBody");
+      tbody.innerHTML = "";
 
-        vulnData.forEach((item, index) => {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td><input type="checkbox" name="vulnCheck" value="${index}" checked></td>
-            <td>${item.vulnid}</td>
-            <td>${item.vulname}</td>
-            <td>${item.risk_level || '-'}</td>
-            <td>${item.targetSystem || '-'}</td>
-            <td>${item.basis || '-'}</td>
-          `;
-          tbody.appendChild(tr);
-        });
-      } catch (err) {
-        console.error("❌ 취약점 목록 불러오기 실패:", err);
-        document.getElementById("status").textContent = "❌ 취약점 목록을 불러오지 못했습니다.";
-      }
-    }
-
-    function generateTemplateId() {
-      return 'tmpl-' + Math.random().toString(36).substring(2, 10);
-    }
-
-    document.getElementById("templateForm").addEventListener("submit", async function (e) {
-      e.preventDefault();
-
-      const formData = new FormData(this);
-      const checkedIndexes = formData.getAll('vulnCheck');
-
-      const templatename = formData.get("templatename");
-      const serverName = formData.get("serverName");
-      const hostName = formData.get("hostName");
-      const ip = formData.get("ip");
-      const targetType = formData.get("targetType");
-      const templateid = generateTemplateId();
-
-      if (!targetType) {
-        document.getElementById("status").textContent = "⚠️ 평가 대상을 선택하세요.";
+      if (!res.ok) {
+        document.getElementById("status").textContent = "❌ 목록을 불러오지 못했습니다.";
         return;
       }
 
-      const selectedTemplates = checkedIndexes.map(index => {
-        const i = parseInt(index);
-        return {
-          templateid,
-          templatename,
-          vulnid: vulnData[i].vulnid,
-          serverName,
-          hostName,
-          ip,
-          targetType,
-          vulName: vulnData[i].vulname,
-          result: "미점검",
-          assessYN: "N"
-        };
+      vulnData = await res.json();
+      vulnData.forEach((item, index) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td><input type="checkbox" name="vulnCheck" value="${index}" checked></td>
+          <td>${item.vulnid}</td>
+          <td>${item.vulname}</td>
+          <td>${item.risk_level}</td>
+          <td>${item.targetSystem}</td>
+          <td>${item.basis}</td>
+        `;
+        tbody.appendChild(tr);
       });
-
-      if (selectedTemplates.length === 0) {
-        document.getElementById("status").textContent = "⚠️ 최소 1개 이상 항목을 선택해야 합니다.";
-        return;
-      }
-
-      let successCount = 0;
-      for (const tmpl of selectedTemplates) {
-        try {
-          const res = await fetch('/api/template', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(tmpl)
-          });
-          if (res.ok) successCount++;
-        } catch (err) {
-          console.error("❌ 전송 실패:", err);
-        }
-      }
-
-      if (successCount > 0) {
-        window.location.href = `/result.html?templateid=${templateid}`;
-      } else {
-        document.getElementById("status").textContent = "❌ 등록 실패: 서버에 저장되지 않았습니다.";
-      }
-    });
+    }
 
     document.querySelector('select[name="targetType"]').addEventListener('change', () => {
       const targetType = document.querySelector('select[name="targetType"]').value;
-      const basisType = document.querySelector('select[name="basisType"]').value;
-      fetchVulnList(targetType, basisType);
+      const subTargetsDiv = document.getElementById("subTargets");
+      subTargetsDiv.style.display = targetType === "Server" ? "block" : "none";
+      fetchVulnList();
     });
 
-    document.querySelector('select[name="basisType"]').addEventListener('change', () => {
-      const targetType = document.querySelector('select[name="targetType"]').value;
-      const basisType = document.querySelector('select[name="basisType"]').value;
-      fetchVulnList(targetType, basisType);
+    document.querySelectorAll('input[name="subTarget"]').forEach(input => {
+      input.addEventListener('change', fetchVulnList);
     });
 
-    window.addEventListener('DOMContentLoaded', () => {
-      const targetType = document.querySelector('select[name="targetType"]').value;
-      const basisType = document.querySelector('select[name="basisType"]').value;
-      fetchVulnList(targetType, basisType);
-    });
+    document.querySelector('select[name="basisType"]').addEventListener('change', fetchVulnList);
+    window.addEventListener('DOMContentLoaded', fetchVulnList);
   </script>
 </body>
 </html>

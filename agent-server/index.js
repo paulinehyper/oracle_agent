@@ -372,7 +372,7 @@ app.get('/api/template/summary/all', async (req, res) => {
 
 
 app.get('/api/vulnerability', async (req, res) => {
-  const { targetType, basisFilter } = req.query;
+  const { targetType, basisFilter, subTargets } = req.query;
 
   try {
     const result = await pool.query(`
@@ -384,7 +384,8 @@ app.get('/api/vulnerability', async (req, res) => {
         target_aix, target_hp_ux, target_linux,
         target_solaris, target_win, target_webservice,
         target_apache, target_webtob, target_iis,
-        target_tomcat, target_jeus
+        target_tomcat, target_jeus,
+        target_type
       FROM vulnerability
       ORDER BY vul_id
     `);
@@ -392,9 +393,30 @@ app.get('/api/vulnerability', async (req, res) => {
     const filtered = result.rows.filter(row => {
       let targetMatch = true;
       let basisMatch = true;
+      let subTargetMatch = true;
 
+      // 평가대상 상위 필터
       if (targetType) {
-        const map = {
+        targetMatch = row.target_type?.toLowerCase() === targetType.toLowerCase();
+      }
+
+      // 평가기반 필터
+      if (basisFilter) {
+        const filters = basisFilter.split(',').map(f => f.trim());
+        if (filters.includes('전자금융') && !filters.includes('주요정보')) {
+          basisMatch = row.basis_financial === 'o';
+        } else if (!filters.includes('전자금융') && filters.includes('주요정보')) {
+          basisMatch = row.basis_critical_info === 'o';
+        } else if (filters.includes('전자금융') && filters.includes('주요정보')) {
+          basisMatch = row.basis_financial === 'o' || row.basis_critical_info === 'o';
+        } else {
+          basisMatch = false;
+        }
+      }
+
+      // 하위 대상 필터
+      if (subTargets) {
+        const targetFields = {
           'AIX': row.target_aix,
           'HP-UX': row.target_hp_ux,
           'LINUX': row.target_linux,
@@ -405,26 +427,13 @@ app.get('/api/vulnerability', async (req, res) => {
           'WebtoB': row.target_webtob,
           'IIS': row.target_iis,
           'Tomcat': row.target_tomcat,
-          'JEUS': row.target_jeus,
+          'JEUS': row.target_jeus
         };
-        targetMatch = map[targetType] === 'o';
+        const subTargetList = subTargets.split(',').map(s => s.trim());
+        subTargetMatch = subTargetList.some(key => targetFields[key] === 'o');
       }
-if (basisFilter) {
-  const filters = basisFilter.split(',').map(f => f.trim());
 
-  if (filters.includes('전자금융') && !filters.includes('주요정보')) {
-    basisMatch = row.basis_financial === 'o';
-  } else if (!filters.includes('전자금융') && filters.includes('주요정보')) {
-    basisMatch = row.basis_critical_info === 'o';
-  } else if (filters.includes('전자금융') && filters.includes('주요정보')) {
-    basisMatch = row.basis_financial === 'o' || row.basis_critical_info === 'o';
-  } else {
-    basisMatch = false;  // 예상 외 값일 경우
-  }
-}
-
-
-      return targetMatch && basisMatch;
+      return targetMatch && basisMatch && subTargetMatch;
     });
 
     const response = filtered.map(row => {
