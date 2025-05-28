@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>자산 등록</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f5f7fa;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 400px;
+      margin: 60px auto;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+      padding: 32px 24px;
+    }
+    h2 {
+      margin-top: 0;
+      color: #222;
+      text-align: center;
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+      color: #333;
+    }
+    select, input[type="text"], input[type="number"] {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 20px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      background: #0984e3;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: #0652dd;
+    }
+    a {
+      display: block;
+      margin-top: 16px;
+      text-align: center;
+      color: #0984e3;
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>자산 등록</h2>
+    <form>
+      <label for="category">자산 분류</label>
+      <select id="category" name="category" required>
+        <option value="">선택하세요</option>
+        <option value="server">서버</option>
+        <option value="database">데이터베이스</option>
+        <option value="network">네트워크</option>
+        <option value="security">보안</option>
+      </select>
+
+      <label for="name">자산 이름</label>
+      <input type="text" id="name" name="name" placeholder="자산 이름을 입력하세요" required>
+
+      <label for="hostname">호스트네임</label>
+      <input type="text" id="hostname" name="hostname" placeholder="호스트네임을 입력하세요" required>
+
+      <label for="ip1">IP 주소</label>
+      <div style="display: flex; gap: 6px; margin-bottom: 20px;">
+        <input type="number" id="ip1" name="ip1" min="0" max="255" required style="width:60px;" placeholder="0">
+        <span>.</span>
+        <input type="number" id="ip2" name="ip2" min="0" max="255" required style="width:60px;" placeholder="0">
+        <span>.</span>
+        <input type="number" id="ip3" name="ip3" min="0" max="255" required style="width:60px;" placeholder="0">
+        <span>.</span>
+        <input type="number" id="ip4" name="ip4" min="0" max="255" required style="width:60px;" placeholder="0">
+      </div>
+
+      <label for="manager">관리자</label>
+      <input type="text" id="manager" name="manager" placeholder="관리자 이름(10자 이내)" maxlength="10" required>
+
+      <button type="submit">등록하기</button>
+    </form>
+    <input type="file" id="csvFile" accept=".csv" style="margin-top:16px;">
+    <div id="csvPreview" style="margin-top:20px;"></div>
+    <a href="/sample/asset_sample.csv" download>
+      📥 예제 양식 다운로드
+    </a>
+  </div>
+  <script>
+    // IP 입력 유효성 검사
+    document.querySelector('form').addEventListener('submit', function(e) {
+      const ip1 = document.getElementById('ip1').value;
+      const ip2 = document.getElementById('ip2').value;
+      const ip3 = document.getElementById('ip3').value;
+      const ip4 = document.getElementById('ip4').value;
+      const ipArr = [ip1, ip2, ip3, ip4];
+      if (
+        ipArr.some(part => part === "" || isNaN(part) || Number(part) < 0 || Number(part) > 255)
+      ) {
+        alert('각 IP 칸에 0~255 사이의 숫자를 입력하세요.');
+        e.preventDefault();
+      }
+    });
+
+    // CSV 미리보기 및 입력란 자동 채우기
+    document.getElementById('csvFile').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const text = evt.target.result;
+        const rows = text.trim().split('\n').map(row => row.split(','));
+        // 미리보기 테이블
+        let html = '<table border="1" style="width:100%; border-collapse:collapse; margin-top:10px;">';
+        rows.forEach((row, idx) => {
+          html += '<tr>';
+          row.forEach(cell => {
+            html += idx === 0
+              ? `<th style="padding:4px; background:#f0f0f0;">${cell}</th>`
+              : `<td style="padding:4px;">${cell}</td>`;
+          });
+          html += '</tr>';
+        });
+        html += '</table>';
+        document.getElementById('csvPreview').innerHTML = html;
+
+        // 입력란 자동 채우기 (첫 번째 데이터 행)
+        if (rows.length > 1) {
+          const header = rows[0];
+          const data = rows[1];
+          const map = {};
+          header.forEach((h, i) => map[h.trim()] = data[i] ? data[i].trim() : '');
+
+          // 필드명에 맞게 입력란 채우기
+          // 자산분류,자산이름,호스트네임,IP주소,관리자
+          if (map['자산분류']) {
+            // select에서 value와 한글이 다르므로 변환 필요
+            const categoryMap = { '서버': 'server', '데이터베이스': 'database', '네트워크': 'network', '보안': 'security' };
+            document.getElementById('category').value = categoryMap[map['자산분류']] || '';
+          }
+          if (map['자산이름']) document.getElementById('name').value = map['자산이름'];
+          if (map['호스트네임']) document.getElementById('hostname').value = map['호스트네임'];
+          if (map['IP주소']) {
+            const ipParts = map['IP주소'].split('.');
+            if (ipParts.length === 4) {
+              document.getElementById('ip1').value = ipParts[0];
+              document.getElementById('ip2').value = ipParts[1];
+              document.getElementById('ip3').value = ipParts[2];
+              document.getElementById('ip4').value = ipParts[3];
+            }
+          }
+          if (map['관리자']) document.getElementById('manager').value = map['관리자'];
+        }
+      };
+      reader.readAsText(file, 'utf-8');
+    });
+  </script>
+</body>
+</html>
