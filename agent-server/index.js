@@ -124,6 +124,25 @@ app.get('/api/template/list', async (req, res) => {
   }
 });
 
+// unique-name API
+app.get('/api/template/unique-name', async (req, res) => {
+  const baseName = req.query.name;
+  if (!baseName) return res.status(400).json({ error: "name is required" });
+
+  const regex = new RegExp(`^${baseName}(\\((\\d+)\\))?$`);
+  const templates = await db.collection('templates').find({ template_name: { $regex: regex } }).toArray();
+
+  const suffixes = templates
+    .map(t => {
+      const match = t.template_name.match(/\((\d+)\)$/);
+      return match ? parseInt(match[1]) : 0;
+    });
+
+  const nextSuffix = suffixes.length > 0 ? Math.max(...suffixes) + 1 : 0;
+  const uniqueName = nextSuffix === 0 ? baseName : `${baseName}(${nextSuffix})`;
+
+  res.json({ uniqueName });
+});
 
 
 app.post('/upload', upload.single('csvfile'), (req, res) => {

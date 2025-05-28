@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>템플릿 일괄 추가</title>
+  <title>템플리트 등록</title>
   <style>
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -10,7 +10,6 @@
       margin: 0;
       padding: 0;
     }
-
     .container {
       max-width: 1200px;
       margin: 40px auto;
@@ -21,11 +20,9 @@
       display: flex;
       gap: 30px;
     }
-
     .form-section {
       flex: 1;
     }
-
     .vuln-section {
       flex: 1.2;
       max-height: 700px;
@@ -33,20 +30,17 @@
       border-left: 1px solid #ddd;
       padding-left: 20px;
     }
-
     h1 {
       text-align: center;
       color: #0056b3;
       margin-bottom: 30px;
     }
-
     label {
       font-weight: bold;
       color: #333;
       margin-top: 10px;
       display: block;
     }
-
     input[type="text"], select {
       width: 100%;
       padding: 10px;
@@ -55,19 +49,11 @@
       border-radius: 6px;
       font-size: 14px;
     }
-
-    .inline-group {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
     .checkbox-group {
       display: flex;
       gap: 10px;
       margin-top: 5px;
     }
-
     .sub-targets-box {
       display: flex;
       flex-wrap: wrap;
@@ -78,38 +64,31 @@
       border-radius: 6px;
       background-color: #f0f6ff;
     }
-
     .sub-targets-box label {
       font-weight: normal;
     }
-
     table {
       width: 100%;
       border-collapse: collapse;
       text-align: center;
     }
-
     th, td {
       padding: 10px;
       border: 1px solid #e0e0e0;
       font-size: 13px;
     }
-
     th {
       background-color: #eaf3ff;
       color: #0056b3;
       position: sticky;
       top: 0;
-      background-clip: padding-box;
     }
-
     .status {
       text-align: center;
       margin-top: 20px;
       color: #d00;
       font-weight: bold;
     }
-
     button {
       width: 100%;
       padding: 12px;
@@ -121,26 +100,54 @@
       cursor: pointer;
       margin-top: 20px;
     }
-
     button:hover {
+      background-color: #0056b3;
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 999;
+      left: 0; top: 0;
+      width: 100%; height: 100%;
+      background-color: rgba(0,0,0,0.4);
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-content {
+      background-color: white;
+      padding: 30px;
+      border-radius: 12px;
+      text-align: center;
+      font-size: 18px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+      position: relative;
+    }
+    .modal-content button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 15px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      background-color: #007bff;
+      color: white;
+    }
+    .modal-content button:hover {
       background-color: #0056b3;
     }
   </style>
 </head>
 <body>
-  <h1>➕ 템플릿 일괄 추가</h1>
-
+  <h1>➕ 템플리트 등록</h1>
   <div class="container">
     <form id="templateForm" class="form-section">
-      <label>진단 템플릿명:</label>
+      <label>진단 템플리트명:</label>
       <input type="text" name="templatename" required />
-
       <label>평가기반:</label>
       <div class="checkbox-group">
-        <label><input type="checkbox" name="basisType" value="전자금융" checked /> 전자금융</label>
+        <label><input type="checkbox" name="basisType" value="전자금육" checked /> 전자금육</label>
         <label><input type="checkbox" name="basisType" value="주요정보" checked /> 주요정보</label>
       </div>
-
       <label>평가 대상:</label>
       <select name="targetType" required>
         <option value="">-- 선택 --</option>
@@ -149,13 +156,10 @@
         <option value="Network">Network</option>
         <option value="Security">Security</option>
       </select>
-
       <div class="sub-targets-box" id="subTargets"></div>
-
       <button type="submit">등록</button>
       <div class="status" id="status"></div>
     </form>
-
     <div class="vuln-section">
       <table>
         <thead>
@@ -172,7 +176,12 @@
       </table>
     </div>
   </div>
-
+  <div id="successModal" class="modal">
+    <div class="modal-content">
+      <p id="successMessage">✅ 템플리트가 성공적으로 등록되었습니다.</p>
+      <button onclick="closeModal()">닫기</button>
+    </div>
+  </div>
   <script>
     const subTargetGroups = {
       Server: ['AIX', 'HP-UX', 'LINUX', 'SOLARIS', 'WIN', '웹서비스', 'Apache', 'WebtoB', 'IIS', 'Tomcat', 'JEUS'],
@@ -185,7 +194,6 @@
       const box = document.getElementById('subTargets');
       box.innerHTML = '';
       if (!group || !subTargetGroups[group]) return;
-
       subTargetGroups[group].forEach(item => {
         const label = document.createElement('label');
         label.innerHTML = `<input type="checkbox" name="subTarget" value="${item}" checked /> ${item}`;
@@ -197,7 +205,6 @@
       const targetType = document.querySelector('select[name="targetType"]').value;
       const basisTypes = Array.from(document.querySelectorAll('input[name="basisType"]:checked')).map(cb => cb.value);
       const subTargets = Array.from(document.querySelectorAll('input[name="subTarget"]:checked')).map(cb => cb.value);
-
       const query = new URLSearchParams();
       if (targetType) query.append('targetType', targetType);
       if (basisTypes.length) query.append('basisFilter', basisTypes.join(','));
@@ -227,71 +234,72 @@
       });
     }
 
-    document.querySelector('select[name="targetType"]').addEventListener('change', () => {
-      const type = document.querySelector('select[name="targetType"]').value;
-      renderSubTargets(type);
+    document.querySelector('select[name="targetType"]').addEventListener('change', (e) => {
+      const selected = e.target.value;
+      renderSubTargets(selected);
       fetchVulnList();
     });
 
-    document.addEventListener('change', e => {
-      if (e.target.name === 'subTarget') {
+    document.addEventListener('change', (e) => {
+      if (["subTarget", "basisType"].includes(e.target.name)) {
         fetchVulnList();
-      }
-
-      if (e.target.name === 'basisType') {
-        const checked = document.querySelectorAll('input[name="basisType"]:checked');
-        if (checked.length === 0) {
-          alert("⚠️ 최소 하나의 평가기반은 선택되어 있어야 합니다.");
-          e.target.checked = true;
-        } else {
-          fetchVulnList();
-        }
       }
     });
 
     window.addEventListener('DOMContentLoaded', () => {
       fetchVulnList();
     });
+
+    async function checkDuplicateTemplateName(name) {
+      const res = await fetch('/api/template/list');
+      const list = await res.json();
+      return list.some(t => t.template_name === name);
+    }
+
+    document.getElementById('templateForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const status = document.getElementById('status');
+      status.textContent = '';
+
+      let template_name = document.querySelector('input[name="templatename"]').value.trim();
+      const target_type = document.querySelector('select[name="targetType"]').value;
+      const basis_type = Array.from(document.querySelectorAll('input[name="basisType"]:checked')).map(cb => cb.value).join(',');
+      const vulns = Array.from(document.querySelectorAll('input[name="vulnCheck"]:checked')).map(cb => {
+        const row = cb.closest('tr');
+        return {
+          vulnid: row.children[1].textContent.trim(),
+          vulname: row.children[2].textContent.trim()
+        };
+      });
+
+      if (!template_name || !target_type || !basis_type || vulns.length === 0) {
+        status.textContent = "❗ 모든 항목을 입력하세요.";
+        return;
+      }
+
+      const isDuplicate = await checkDuplicateTemplateName(template_name);
+      if (isDuplicate) {
+        status.textContent = "❗ 동일한 템플릿명이 존재합니다.";
+        return;
+      }
+
+      const res = await fetch('/api/template', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ template_name, target_type, basis_type, vulns })
+      });
+
+      if (res.ok) {
+        document.getElementById('successMessage').textContent = `✅ 템플리트 '${template_name}' 이(가) 성공적으로 등록되었습니다.`;
+        document.getElementById('successModal').style.display = 'flex';
+      } else {
+        status.textContent = "❌ 등록 실패";
+      }
+    });
+
+    function closeModal() {
+      document.getElementById('successModal').style.display = 'none';
+    }
   </script>
-
- <script>
-  document.getElementById('templateForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
-
-    const template_name = document.querySelector('input[name="templatename"]').value.trim();
-    const target_type = document.querySelector('select[name="targetType"]').value;
-    const basis_type = Array.from(document.querySelectorAll('input[name="basisType"]:checked')).map(cb => cb.value).join(',');
-
-    const vulns = Array.from(document.querySelectorAll('input[name="vulnCheck"]:checked')).map(checkbox => {
-      const row = checkbox.closest('tr');
-      return {
-        vulnid: row.children[1].textContent.trim(),
-        vulname: row.children[2].textContent.trim()
-      };
-    });
-
-    if (!template_name || !target_type || !basis_type || vulns.length === 0) {
-      document.getElementById('status').textContent = "❗ 모든 항목을 입력하세요.";
-      return;
-    }
-
-    const res = await fetch('/api/template', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ template_name, target_type, basis_type, vulns })
-    });
-
-    const status = document.getElementById('status');
-    if (res.ok) {
-      status.textContent = "✅ 등록 성공";
-      document.getElementById('templateForm').reset();
-      fetchVulnList();
-    } else {
-      status.textContent = "❌ 등록 실패";
-    }
-  });
-</script>
-
-
 </body>
 </html>
