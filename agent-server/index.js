@@ -1,8 +1,13 @@
 const express = require('express');
-const { Pool } = require('pg');
 const cors = require('cors');
 const app = express();
 const port = 3000;
+const multer = require('multer');
+const csv = require('csv-parser');
+const fs = require('fs');
+const { Pool } = require('pg');
+const upload = multer({ dest: 'uploads/' });
+
 
 // PostgreSQL 연결 설정
 const pool = new Pool({
@@ -113,6 +118,99 @@ app.post('/api/template', async (req, res) => {
   }
 });
 
+app.post('/upload', upload.single('csvfile'), (req, res) => {
+  const filePath = req.file.path;
+  const results = [];
+
+  // 한글 ➜ vulnerability 테이블 컬럼명 매핑
+  const fieldMapping = {
+    "평가항목ID": "vul_id",
+    "구분": "category",
+    "통제분야": "control_area",
+    "통제구분(대)": "control_type_large",
+    "통제구분(중)": "control_type_medium",
+    "평가항목": "vul_name",
+    "위험도": "risk_level",
+    "상세설명": "details",
+    "평가기반(전자금융)": "basis_financial",
+    "평가기반(주요정보)": "basis_critical_info",
+    "평가대상(AIX)": "target_aix",
+    "평가대상(HP-UX)": "target_hp_ux",
+    "평가대상(LINUX)": "target_linux",
+    "평가대상(SOLARIS)": "target_solaris",
+    "평가대상(WIN)": "target_win",
+    "평가대상(웹서비스)": "target_webservice",
+    "평가대상(Apache)": "target_apache",
+    "평가대상(WebtoB)": "target_webtob",
+    "평가대상(IIS)": "target_iis",
+    "평가대상(Tomcat)": "target_tomcat",
+    "평가대상(JEUS)": "target_jeus"
+  };
+
+  fs.createReadStream(filePath)
+    .pipe(csv())
+    .on('data', (data) => {
+      const mappedRow = {};
+      for (const [key, value] of Object.entries(data)) {
+        const engKey = fieldMapping[key.trim()];
+        if (engKey) {
+          mappedRow[engKey] = value;
+        }
+      }
+
+      // 위험도(risk_level)를 정수로 변환
+      if (mappedRow.risk_level) {
+        const intValue = parseInt(mappedRow.risk_level);
+        mappedRow.risk_level = isNaN(intValue) ? null : intValue;
+      }
+
+      results.push(mappedRow);
+    })
+    .on('end', async () => {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        for (const row of results) {
+          await client.query(`
+            INSERT INTO vulnerability (
+              vul_id, category, control_area, control_type_large, control_type_medium,
+              vul_name, risk_level, details,
+              basis_financial, basis_critical_info,
+              target_aix, target_hp_ux, target_linux,
+              target_solaris, target_win, target_webservice,
+              target_apache, target_webtob, target_iis, target_tomcat, target_jeus
+            ) VALUES (
+              $1, $2, $3, $4, $5,
+              $6, $7::integer, $8,
+              $9, $10,
+              $11, $12, $13,
+              $14, $15, $16,
+              $17, $18, $19, $20, $21
+            )
+            ON CONFLICT (vul_id) DO NOTHING
+          `, [
+            row.vul_id, row.category, row.control_area, row.control_type_large, row.control_type_medium,
+            row.vul_name, row.risk_level, row.details,
+            row.basis_financial, row.basis_critical_info,
+            row.target_aix, row.target_hp_ux, row.target_linux,
+            row.target_solaris, row.target_win, row.target_webservice,
+            row.target_apache, row.target_webtob, row.target_iis, row.target_tomcat, row.target_jeus
+          ]);
+        }
+        await client.query('COMMIT');
+        res.send('✅ 취약점 CSV 업로드 및 저장 완료');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('❌ 취약점 CSV 저장 실패:', err.message);
+        res.status(500).send('❌ 저장 실패');
+      } finally {
+        client.release();
+        fs.unlinkSync(filePath); // 임시파일 삭제
+      }
+    });
+});
+
+
 
 
 // 템플릿 항목 일괄 저장
@@ -185,6 +283,7 @@ app.get('/api/template/by-id/:templateid', async (req, res) => {
     res.status(500).send('DB 조회 실패');
   }
 });
+
 
 // 점검 결과 저장
 app.post('/api/result', async (req, res) => {
@@ -272,66 +371,100 @@ app.get('/api/template/summary/all', async (req, res) => {
 
 
 
-// 템플릿 목록 조회
-app.get('/api/template/list', async (req, res) => {
-  try {
-    const result = await pool.query(
-      `SELECT DISTINCT templateid, templatename, host_name
-       FROM evaluation_results
-       ORDER BY templateid DESC`
-    );
-    res.json(result.rows);
-  } catch (err) {
-    console.error('❌ 템플릿 목록 조회 실패:', err.message);
-    res.status(500).send('템플릿 목록 조회 실패');
-  }
-});
-
-app.get('/api/templates', async (req, res) => {
-  try {
-    const result = await pool.query(
-      `SELECT DISTINCT templateid, templatename, host_name AS hostname
-       FROM evaluation_results
-       ORDER BY templateid DESC`
-    );
-    res.json(result.rows);
-  } catch (err) {
-    console.error('❌ /api/templates DB 조회 실패:', err.message);
-    res.status(500).json({ error: err.message || 'DB 조회 실패' });
-  }
-});
-
-
 app.get('/api/vulnerability', async (req, res) => {
-  const { targetType } = req.query;
+  const { targetType, basisFilter } = req.query;
 
   try {
-    let result;
+    const result = await pool.query(`
+      SELECT 
+        vul_id, vul_name, category, control_area,
+        control_type_large, control_type_medium,
+        risk_level, details,
+        basis_financial, basis_critical_info,
+        target_aix, target_hp_ux, target_linux,
+        target_solaris, target_win, target_webservice,
+        target_apache, target_webtob, target_iis,
+        target_tomcat, target_jeus
+      FROM vulnerability
+      ORDER BY vul_id
+    `);
 
-    if (targetType && targetType.trim() !== '') {
-      // 평가 대상이 명시된 경우 → 필터링
-      result = await pool.query(`
-        SELECT vul_id AS vulnid, vul_name AS vulname
-        FROM vulnerability
-        WHERE target_type = $1
-        ORDER BY vul_id
-      `, [targetType]);
-    } else {
-      // 선택 안 된 경우 → 전체 보여주기
-      result = await pool.query(`
-        SELECT vul_id AS vulnid, vul_name AS vulname
-        FROM vulnerability
-        ORDER BY vul_id
-      `);
-    }
+    const filtered = result.rows.filter(row => {
+      let targetMatch = true;
+      let basisMatch = true;
 
-    res.json(result.rows);
+      if (targetType) {
+        const map = {
+          'AIX': row.target_aix,
+          'HP-UX': row.target_hp_ux,
+          'LINUX': row.target_linux,
+          'SOLARIS': row.target_solaris,
+          'WIN': row.target_win,
+          '웹서비스': row.target_webservice,
+          'Apache': row.target_apache,
+          'WebtoB': row.target_webtob,
+          'IIS': row.target_iis,
+          'Tomcat': row.target_tomcat,
+          'JEUS': row.target_jeus,
+        };
+        targetMatch = map[targetType] === 'o';
+      }
+if (basisFilter) {
+  const filters = basisFilter.split(',').map(f => f.trim());
+
+  if (filters.includes('전자금융') && !filters.includes('주요정보')) {
+    basisMatch = row.basis_financial === 'o';
+  } else if (!filters.includes('전자금융') && filters.includes('주요정보')) {
+    basisMatch = row.basis_critical_info === 'o';
+  } else if (filters.includes('전자금융') && filters.includes('주요정보')) {
+    basisMatch = row.basis_financial === 'o' || row.basis_critical_info === 'o';
+  } else {
+    basisMatch = false;  // 예상 외 값일 경우
+  }
+}
+
+
+      return targetMatch && basisMatch;
+    });
+
+    const response = filtered.map(row => {
+      const targets = [];
+      if (row.target_aix === 'o') targets.push('AIX');
+      if (row.target_hp_ux === 'o') targets.push('HP-UX');
+      if (row.target_linux === 'o') targets.push('LINUX');
+      if (row.target_solaris === 'o') targets.push('SOLARIS');
+      if (row.target_win === 'o') targets.push('WIN');
+      if (row.target_webservice === 'o') targets.push('웹서비스');
+      if (row.target_apache === 'o') targets.push('Apache');
+      if (row.target_webtob === 'o') targets.push('WebtoB');
+      if (row.target_iis === 'o') targets.push('IIS');
+      if (row.target_tomcat === 'o') targets.push('Tomcat');
+      if (row.target_jeus === 'o') targets.push('JEUS');
+
+      const basisArr = [];
+      if (row.basis_financial === 'o') basisArr.push('전자금융');
+      if (row.basis_critical_info === 'o') basisArr.push('주요정보');
+
+      return {
+        vulnid: row.vul_id,
+        vulname: row.vul_name,
+        category: row.category,
+        control_area: row.control_area,
+        control_type_large: row.control_type_large,
+        control_type_medium: row.control_type_medium,
+        risk_level: row.risk_level,
+        details: row.details,
+        targetSystem: targets.join(', '),
+        basis: basisArr.join(', ')
+      };
+    });
+
+    res.json(response);
   } catch (err) {
     console.error('❌ vulnerability 조회 실패:', err.message);
     res.status(500).send('DB 조회 실패');
   }
 });
-
 
 
 
