@@ -11,7 +11,7 @@
       padding: 0;
     }
     .container {
-      max-width: 900px;
+      max-width: 1000px;
       margin: 60px auto;
       background: #fff;
       border-radius: 12px;
@@ -23,10 +23,39 @@
       color: #222;
       text-align: center;
     }
+    .controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      padding: 10px 18px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-add {
+      background-color: #00b894;
+      color: white;
+    }
+    .btn-add:hover {
+      background-color: #019875;
+    }
+    select {
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+    }
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 24px;
+      margin-top: 12px;
     }
     th, td {
       border: 1px solid #ccc;
@@ -36,51 +65,115 @@
     th {
       background: #f0f0f0;
     }
+    .btn-delete {
+      background-color: #d63031;
+      color: white;
+      padding: 6px 12px;
+      font-size: 13px;
+      border-radius: 6px;
+    }
+    .btn-delete:hover {
+      background-color: #b71c1c;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <h2>자산 목록</h2>
+    <div class="controls">
+      <div>
+        🔽 <label for="sortSelect">정렬 기준:</label>
+        <select id="sortSelect" onchange="handleSort()">
+          <option value="">-- 선택하세요 --</option>
+          <option value="category">자산 분류</option>
+          <option value="name">자산 이름</option>
+          <option value="hostname">호스트네임</option>
+          <option value="ip">IP 주소</option>
+          <option value="manager">관리자</option>
+        </select>
+        <select id="orderSelect" onchange="handleSort()">
+          <option value="asc">오름차순</option>
+          <option value="desc">내림차순</option>
+        </select>
+      </div>
+      <button class="btn btn-add" onclick="location.href='/assetform.html'">＋ 자산 등록</button>
+    </div>
     <table id="assetTable">
       <thead>
         <tr>
-          <th>번호</th>
           <th>자산 분류</th>
           <th>자산 이름</th>
           <th>호스트네임</th>
           <th>IP 주소</th>
           <th>관리자</th>
+          <th>삭제</th>
         </tr>
       </thead>
       <tbody>
-        <!-- 데이터가 여기에 표시됩니다 -->
+        <!-- 데이터 삽입 영역 -->
       </tbody>
     </table>
   </div>
+
   <script>
+    let assets = [];
+
     async function fetchAssets() {
       try {
         const res = await fetch('/api/asset/list');
         if (!res.ok) throw new Error('서버 오류');
-        const assets = await res.json();
-        const tbody = document.querySelector('#assetTable tbody');
-        tbody.innerHTML = '';
-        assets.forEach((asset, idx) => {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td>${idx + 1}</td>
-            <td>${asset.category}</td>
-            <td>${asset.name}</td>
-            <td>${asset.hostname}</td>
-            <td>${asset.ip}</td>
-            <td>${asset.manager || ''}</td>
-          `;
-          tbody.appendChild(tr);
-        });
+        assets = await res.json();
+        renderTable();
       } catch (err) {
         alert('자산 목록을 불러오지 못했습니다.');
       }
     }
+
+    function renderTable() {
+      const tbody = document.querySelector('#assetTable tbody');
+      tbody.innerHTML = '';
+      assets.forEach(asset => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${asset.category}</td>
+          <td>${asset.name}</td>
+          <td>${asset.hostname}</td>
+          <td>${asset.ip}</td>
+          <td>${asset.manager || ''}</td>
+          <td><button class="btn-delete" onclick="deleteAsset(${asset.id})">🗑 삭제</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function handleSort() {
+      const key = document.getElementById('sortSelect').value;
+      const order = document.getElementById('orderSelect').value;
+      if (!key) return;
+
+      assets.sort((a, b) => {
+        const valA = (a[key] || '').toLowerCase();
+        const valB = (b[key] || '').toLowerCase();
+        return order === 'asc'
+          ? valA.localeCompare(valB)
+          : valB.localeCompare(valA);
+      });
+
+      renderTable();
+    }
+
+    async function deleteAsset(id) {
+      if (!confirm('정말로 이 자산을 삭제하시겠습니까?')) return;
+      try {
+        const res = await fetch(`/api/asset/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('삭제 실패');
+        assets = assets.filter(a => a.id !== id);
+        renderTable();
+      } catch (err) {
+        alert('자산 삭제 중 오류가 발생했습니다.');
+      }
+    }
+
     fetchAssets();
   </script>
 </body>
