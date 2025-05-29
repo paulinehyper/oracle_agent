@@ -565,11 +565,11 @@ app.listen(port, () => {
  // console.log(`🧪 item[${index}]:`, item);
 //});
 app.post('/api/asset/check-duplicate', async (req, res) => {
-  const { target_type, name, hostname, ip } = req.body;
+  const { ip } = req.body;
   try {
     const result = await pool.query(
-      `SELECT 1 FROM asset WHERE target_type=$1 AND server_name=$2 AND host_name=$3 AND ip=$4 LIMIT 1`,
-      [target_type, name, hostname, ip]
+      `SELECT 1 FROM asset WHERE ip=$1 LIMIT 1`,
+      [ip]
     );
     res.json({ exists: result.rowCount > 0 });
   } catch (err) {

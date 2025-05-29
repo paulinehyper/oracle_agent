@@ -222,13 +222,14 @@
               const newAssets = [];
               const duplicated = [];
               for (const asset of assets) {
-                const check = await checkDuplicateAsset({
-                  target_type: asset.target_type,
-                  name: asset.name,
-                  hostname: asset.hostname,
-                  ip: asset.ip
-                });
-                if (check) {
+                // IP만 중복 체크
+                const check = await fetch('/api/asset/check-duplicate', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ ip: asset.ip })
+                }).then(res => res.json());
+
+                if (check.exists) {
                   duplicated.push(`${asset.name} (${asset.hostname}, ${asset.ip})`);
                 } else {
                   newAssets.push(asset);
@@ -236,7 +237,7 @@
               }
 
               if (duplicated.length > 0) {
-                showModal(`중복된 데이터는 제외하고 등록합니다:\n\n${duplicated.join('\n')}`);
+                showModal(`다음 IP는 이미 등록되어 제외됩니다:\n\n${duplicated.join('\n')}`);
               }
 
               if (newAssets.length === 0) {
