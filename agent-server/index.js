@@ -576,3 +576,15 @@ app.post('/api/asset/check-duplicate', async (req, res) => {
     res.status(500).json({ error: 'DB 오류' });
   }
 });
+
+// 자산 삭제
+app.delete('/api/asset/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query('DELETE FROM asset WHERE id = $1', [id]);
+    res.status(200).send('deleted');
+  } catch (err) {
+    console.error('❌ 자산 삭제 실패:', err.message);
+    res.status(500).send('error');
+  }
+});

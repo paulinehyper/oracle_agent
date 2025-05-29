@@ -2,127 +2,38 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>보안 점검 시스템 홈</title>
-  <style>
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      margin: 0;
-      padding: 0;
-      background-color: #f5f7fa;
-    }
-
-    header {
-      background-color: #343a40;
-      color: white;
-      padding: 16px 24px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      position: sticky;
-      top: 0;
-      z-index: 1000;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    }
-
-    header h1 {
-      font-size: 1.5em;
-      margin: 0;
-    }
-
-    #resultLink {
-      background: #00b894;
-      color: white;
-      padding: 10px 16px;
-      border-radius: 8px;
-      font-weight: bold;
-      text-decoration: none;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-      transition: background 0.3s ease-in-out;
-      margin-left: 10px;
-    }
-
-    #resultLink:hover {
-      background: #019875;
-    }
-
-    main {
-      padding: 40px 24px;
-      text-align: center;
-    }
-
-    .action {
-      margin-top: 30px;
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-      align-items: center;
-    }
-
-    .action button {
-      padding: 12px 24px;
-      font-size: 16px;
-      border: none;
-      background-color: #0984e3;
-      color: white;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: background 0.3s;
-    }
-
-    .action button:hover {
-      background-color: #0652dd;
-    }
-
-    footer {
-      text-align: center;
-      color: #999;
-      margin-top: 80px;
-      font-size: 14px;
-    }
-  </style>
+  <title>홈페이지</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
   <header>
-    <h1>🔐 보안 점검 시스템</h1>
-    <div>
-      <a href="/result.html?templateid=tmpl-latest" id="resultLink">📊 점검 결과 보기</a>
-      <a href="/templatelist.html" id="resultLink">📋 템플릿 목록 보기</a>
-      <a href="/assetlist.html" id="resultLink">💼 자산 목록 보기</a>
+    <div class="nav-inner">
+      <div class="nav-title">
+        <a href="/">자산관리시스템</a>
+      </div>
+      <nav class="nav-menu">
+        <a href="/">홈</a>
+        <a href="/assetlist.html">자산 목록</a>
+        <a href="/registerasset.html">자산 등록</a>
+        <a href="/templatelist.html">템플릿 목록</a>
+        <a href="/newtemplate.html">새 템플릿 등록</a>
+      </nav>
     </div>
   </header>
 
-  <main>
-    <h2>안전한 시스템을 위한 자동 점검 플랫폼</h2>
-    <p>지금 새로운 점검을 시작하거나 최근 점검 결과를 확인하세요.</p>
-
-    <div class="action">
-      <button onclick="location.href='/newassess.html'">➕ 새로운 점검 시작하기</button>
-      <button onclick="location.href='/newtemplate.html'">📝 새로운 템플릿 만들기</button>
-      <button onclick="location.href='/registerasset.html'">💾 자산 등록</button>
+  <div class="container" style="text-align:center;">
+    <h2>자산관리시스템 홈</h2>
+    <p>자산 등록, 목록 조회, 템플릿 관리 기능을 제공합니다.</p>
+    <div style="margin-top:32px;">
+      <a href="/registerasset.html" class="btn btn-add" style="margin-right:16px;">자산 등록</a>
+      <a href="/assetlist.html" class="btn btn-add" style="margin-right:16px;">자산 목록</a>
+      <a href="/newtemplate.html" class="btn btn-add" style="margin-right:16px;">새 템플릿 등록</a>
+      <a href="/templatelist.html" class="btn btn-add">템플릿 목록</a>
     </div>
-
-    <div style="text-align: center; margin-top: 30px;">
-  <a href="/upload.html">
-    <button style="
-      padding: 12px 24px;
-      background-color: #007bff;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      font-size: 16px;
-      cursor: pointer;
-    ">
-      📁 CSV 업로드
-    </button>
-  </a>
-</div>
-
-  </main>
+  </div>
 
   <footer>
     © 2025 보안 점검 시스템 — All rights reserved.
   </footer>
-
 </body>
 </html>

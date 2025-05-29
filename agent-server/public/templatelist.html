@@ -3,47 +3,28 @@
 <head>
   <meta charset="UTF-8">
   <title>템플릿 목록</title>
-  <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, sans-serif;
-      padding: 40px;
-      background-color: #f8faff;
-    }
-
-    h1 {
-      color: #0056b3;
-      text-align: center;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 30px;
-    }
-
-    th, td {
-      border: 1px solid #ddd;
-      padding: 12px;
-      text-align: center;
-      font-size: 14px;
-    }
-
-    th {
-      background-color: #eaf3ff;
-      color: #0056b3;
-    }
-
-    .empty {
-      text-align: center;
-      color: #999;
-      margin-top: 20px;
-      font-size: 16px;
-    }
-  </style>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>📋 등록된 템플릿 목록</h1>
+  <header>
+  <div class="nav-inner">
+    <div class="nav-title">
+      <a href="/">자산관리시스템</a>
+    </div>
+    <nav class="nav-menu">
+      <a href="/">홈</a>
+      <a href="/templatelist.html">템플릿 목록</a>
+      <a href="/newtemplate.html">새 템플릿 등록</a>
+    </nav>
+  </div>
+</header>
 
+<div class="container">
+  <h2>📋 등록된 템플릿 목록</h2>
+  <div class="controls" style="justify-content: flex-end;">
+    <a href="/newtemplate.html" class="btn btn-add" style="margin-right:12px;">＋ 새 템플릿 등록</a>
+    <a href="/" class="btn">홈으로</a>
+  </div>
   <table>
     <thead>
       <tr>
@@ -58,37 +39,38 @@
       <tr><td colspan="5" class="empty">로딩 중...</td></tr>
     </tbody>
   </table>
+</div>
 
-  <script>
-    window.onload = async () => {
-      try {
-        const res = await fetch('/api/template/list');
-        const data = await res.json();
-        const tbody = document.getElementById('templateTable');
-        tbody.innerHTML = '';
+<script>
+  window.onload = async () => {
+    try {
+      const res = await fetch('/api/template/list');
+      const data = await res.json();
+      const tbody = document.getElementById('templateTable');
+      tbody.innerHTML = '';
 
-        if (data.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="5" class="empty">등록된 템플릿이 없습니다.</td></tr>';
-          return;
-        }
-
-        data.forEach(item => {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td>${item.template_id}</td>
-            <td>${item.template_name}</td>
-            <td>${item.target_type}</td>
-            <td>${item.basis_type || '-'}</td>
-            <td>${item.vuln_count}</td>
-          `;
-          tbody.appendChild(tr);
-        });
-      } catch (err) {
-        console.error('템플릿 목록 조회 실패:', err);
-        document.getElementById('templateTable').innerHTML =
-          '<tr><td colspan="5" class="empty">❌ 데이터 로드 실패</td></tr>';
+      if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty">등록된 템플릿이 없습니다.</td></tr>';
+        return;
       }
-    };
-  </script>
+
+      data.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${item.template_id}</td>
+          <td>${item.template_name}</td>
+          <td>${item.target_type}</td>
+          <td>${item.basis_type || '-'}</td>
+          <td>${item.vuln_count}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    } catch (err) {
+      console.error('템플릿 목록 조회 실패:', err);
+      document.getElementById('templateTable').innerHTML =
+        '<tr><td colspan="5" class="empty">❌ 데이터 로드 실패</td></tr>';
+    }
+  };
+</script>
 </body>
 </html>

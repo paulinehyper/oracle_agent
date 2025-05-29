@@ -3,104 +3,31 @@
 <head>
   <meta charset="UTF-8">
   <title>자산 등록</title>
-  <style>
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      background: #f5f7fa;
-      margin: 0;
-      padding: 0;
-    }
-    .container {
-      max-width: 400px;
-      margin: 60px auto;
-      background: #fff;
-      border-radius: 12px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
-      padding: 32px 24px;
-    }
-    h2 {
-      margin-top: 0;
-      color: #222;
-      text-align: center;
-    }
-    label {
-      display: block;
-      margin-bottom: 8px;
-      font-weight: bold;
-      color: #333;
-    }
-    select, input[type="text"], input[type="number"] {
-      width: 100%;
-      padding: 10px;
-      margin-bottom: 20px;
-      border-radius: 6px;
-      border: 1px solid #ccc;
-      font-size: 16px;
-    }
-    button {
-      width: 100%;
-      padding: 12px;
-      background: #0984e3;
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      font-size: 16px;
-      cursor: pointer;
-      font-weight: bold;
-      transition: background 0.2s;
-    }
-    button:hover {
-      background: #0652dd;
-    }
-    a {
-      display: block;
-      margin-top: 16px;
-      text-align: center;
-      color: #0984e3;
-      text-decoration: underline;
-    }
-  </style>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="container">
     <h2>자산 등록</h2>
+    <!-- 입력 폼 및 버튼에 동일한 클래스 사용 -->
     <form id="assetForm">
       <label for="category">자산 분류</label>
       <select id="category" name="category" required>
-        <option value="">선택하세요</option>
+        <option value="">-- 선택하세요 --</option>
         <option value="server">서버</option>
         <option value="database">데이터베이스</option>
         <option value="network">네트워크</option>
         <option value="security">보안</option>
       </select>
-
       <label for="name">자산 이름</label>
-      <input type="text" id="name" name="name" placeholder="자산 이름을 입력하세요" required>
-
+      <input type="text" id="name" name="name" required>
       <label for="hostname">호스트네임</label>
-      <input type="text" id="hostname" name="hostname" placeholder="호스트네임을 입력하세요" required>
-
-      <label for="ip1">IP 주소</label>
-      <div style="display: flex; gap: 6px; margin-bottom: 20px;">
-        <input type="number" id="ip1" name="ip1" min="0" max="255" required style="width:60px;" placeholder="0">
-        <span>.</span>
-        <input type="number" id="ip2" name="ip2" min="0" max="255" required style="width:60px;" placeholder="0">
-        <span>.</span>
-        <input type="number" id="ip3" name="ip3" min="0" max="255" required style="width:60px;" placeholder="0">
-        <span>.</span>
-        <input type="number" id="ip4" name="ip4" min="0" max="255" required style="width:60px;" placeholder="0">
-      </div>
-
+      <input type="text" id="hostname" name="hostname" required>
+      <label for="ip">IP 주소</label>
+      <input type="text" id="ip" name="ip" required>
       <label for="manager">관리자</label>
-      <input type="text" id="manager" name="manager" placeholder="관리자 이름(10자 이내)" maxlength="10" required>
-
-      <button type="submit">등록하기</button>
+      <input type="text" id="manager" name="manager">
+      <button type="submit" class="btn btn-add">등록</button>
     </form>
-    <input type="file" id="csvFile" accept=".csv" style="margin-top:16px;">
-    <div id="csvPreview" style="margin-top:20px;"></div>
-    <a href="/sample/asset_sample.csv" download>
-      📥 예제 양식 다운로드
-    </a>
   </div>
   <script>
     async function checkDuplicateAsset(asset) {
@@ -116,15 +43,9 @@
     // 단일 등록 시
     document.getElementById('assetForm').addEventListener('submit', async function(e) {
       e.preventDefault();
-      const ip1 = document.getElementById('ip1').value;
-      const ip2 = document.getElementById('ip2').value;
-      const ip3 = document.getElementById('ip3').value;
-      const ip4 = document.getElementById('ip4').value;
-      const ipArr = [ip1, ip2, ip3, ip4];
-      if (
-        ipArr.some(part => part === "" || isNaN(part) || Number(part) < 0 || Number(part) > 255)
-      ) {
-        alert('각 IP 칸에 0~255 사이의 숫자를 입력하세요.');
+      const ipParts = document.getElementById('ip').value.split('.');
+      if (ipParts.length !== 4 || ipParts.some(part => isNaN(part) || Number(part) < 0 || Number(part) > 255)) {
+        alert('IP 주소는 0~255 사이의 숫자 4개로 구성되어야 합니다.');
         return;
       }
 
@@ -132,7 +53,7 @@
         target_type: document.getElementById('category').value,
         name: document.getElementById('name').value,
         hostname: document.getElementById('hostname').value,
-        ip: `${ip1}.${ip2}.${ip3}.${ip4}`
+        ip: document.getElementById('ip').value
       };
       if (await checkDuplicateAsset(asset)) {
         showModal('이미 등록된 자산입니다.');
@@ -143,7 +64,7 @@
         category: document.getElementById('category').value,
         name: document.getElementById('name').value,
         hostname: document.getElementById('hostname').value,
-        ip: `${ip1}.${ip2}.${ip3}.${ip4}`,
+        ip: document.getElementById('ip').value,
         manager: document.getElementById('manager').value
       };
 
