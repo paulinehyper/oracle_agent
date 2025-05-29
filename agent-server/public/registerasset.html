@@ -103,7 +103,17 @@
     </a>
   </div>
   <script>
-    // IP 입력 유효성 검사 및 서버로 전송
+    async function checkDuplicateAsset(asset) {
+      const res = await fetch('/api/asset/check-duplicate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(asset)
+      });
+      const data = await res.json();
+      return data.exists;
+    }
+
+    // 단일 등록 시
     document.getElementById('assetForm').addEventListener('submit', async function(e) {
       e.preventDefault();
       const ip1 = document.getElementById('ip1').value;
@@ -115,6 +125,17 @@
         ipArr.some(part => part === "" || isNaN(part) || Number(part) < 0 || Number(part) > 255)
       ) {
         alert('각 IP 칸에 0~255 사이의 숫자를 입력하세요.');
+        return;
+      }
+
+      const asset = {
+        target_type: document.getElementById('category').value,
+        name: document.getElementById('name').value,
+        hostname: document.getElementById('hostname').value,
+        ip: `${ip1}.${ip2}.${ip3}.${ip4}`
+      };
+      if (await checkDuplicateAsset(asset)) {
+        showModal('이미 등록된 자산입니다.');
         return;
       }
 
@@ -173,38 +194,73 @@
         // 여러 행이 있으면 팝업 띄우기
         if (rows.length > 2) {
           if (confirm(`${rows.length - 1} 행의 데이터가 있습니다. 등록하시겠습니까?`)) {
-            // 첫 행은 헤더, 나머지는 데이터
-            const header = rows[0];
+            const header = rows[0].map(h => h.trim());
+            const headerMap = {
+              '자산분류': 'category',
+              '자산이름': 'name',
+              '호스트네임': 'hostname',
+              'IP주소': 'ip',
+              '관리자': 'manager'
+            };
             const categoryMap = { '서버': 'server', '데이터베이스': 'database', '네트워크': 'network', '보안': 'security' };
             const assets = [];
             for (let i = 1; i < rows.length; i++) {
               const data = rows[i];
               const map = {};
-              header.forEach((h, idx) => map[h.trim()] = data[idx] ? data[idx].trim() : '');
-              assets.push({
-                category: categoryMap[map['자산분류']] || '',
-                name: map['자산이름'] || '',
-                hostname: map['호스트네임'] || '',
-                ip: map['IP주소'] || '',
-                manager: map['관리자'] || ''
-              });
-            }
-            // 서버로 일괄 등록 요청
-            fetch('/api/asset/bulk', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ assets })
-            })
-            .then(res => {
-              if (res.ok) {
-                alert('자산이 모두 등록되었습니다.');
-                document.getElementById('csvFile').value = '';
-                document.getElementById('csvPreview').innerHTML = '';
-              } else {
-                alert('일괄 등록에 실패했습니다.');
+              header.forEach((h, idx) => map[headerMap[h]] = data[idx] ? data[idx].trim() : '');
+              map.target_type = categoryMap[map.category] || '';
+              delete map.category;
+              if (!map.target_type || !map.name || !map.hostname || !map.ip) {
+                alert(`${i}번째 행에 필수값이 누락되었습니다. (자산분류, 자산이름, 호스트네임, IP주소)`);
+                return;
               }
-            })
-            .catch(() => alert('서버 오류가 발생했습니다.'));
+              assets.push(map);
+            }
+
+            // 모든 행 중복 검사 후 신규만 등록
+            (async () => {
+              const newAssets = [];
+              const duplicated = [];
+              for (const asset of assets) {
+                const check = await checkDuplicateAsset({
+                  target_type: asset.target_type,
+                  name: asset.name,
+                  hostname: asset.hostname,
+                  ip: asset.ip
+                });
+                if (check) {
+                  duplicated.push(`${asset.name} (${asset.hostname}, ${asset.ip})`);
+                } else {
+                  newAssets.push(asset);
+                }
+              }
+
+              if (duplicated.length > 0) {
+                showModal(`중복된 데이터는 제외하고 등록합니다:\n\n${duplicated.join('\n')}`);
+              }
+
+              if (newAssets.length === 0) {
+                alert('등록할 신규 데이터가 없습니다.');
+                return;
+              }
+
+              // 신규 데이터만 등록
+              fetch('/api/asset/bulk', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ assets: newAssets })
+              })
+              .then(res => {
+                if (res.ok) {
+                  alert('신규 자산이 모두 등록되었습니다.');
+                  document.getElementById('csvFile').value = '';
+                  document.getElementById('csvPreview').innerHTML = '';
+                } else {
+                  alert('일괄 등록에 실패했습니다.');
+                }
+              })
+              .catch(() => alert('서버 오류가 발생했습니다.'));
+            })();
           }
         } else if (rows.length === 2) {
           // 기존처럼 첫 데이터 행만 입력란에 자동 채우기
@@ -233,6 +289,28 @@
       };
       reader.readAsText(file, 'utf-8');
     });
+
+    // 모달 함수
+    function showModal(msg) {
+      let modal = document.getElementById('warnModal');
+      if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'warnModal';
+        modal.style.position = 'fixed';
+        modal.style.left = '0'; modal.style.top = '0';
+        modal.style.width = '100vw'; modal.style.height = '100vh';
+        modal.style.background = 'rgba(0,0,0,0.3)';
+        modal.style.display = 'flex'; modal.style.alignItems = 'center'; modal.style.justifyContent = 'center';
+        modal.innerHTML = `<div style="background:#fff;padding:32px 24px;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,0.15);text-align:center;">
+          <div style="margin-bottom:16px;font-size:18px;">${msg}</div>
+          <button onclick="document.getElementById('warnModal').remove()" style="padding:8px 24px;font-size:16px;">확인</button>
+        </div>`;
+        document.body.appendChild(modal);
+      } else {
+        modal.querySelector('div>div').innerText = msg;
+        modal.style.display = 'flex';
+      }
+    }
   </script>
 </body>
 </html>

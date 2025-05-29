@@ -497,7 +497,7 @@ app.post('/api/asset', async (req, res) => {
   const { category, name, hostname, ip, manager } = req.body;
   try {
     await pool.query(
-      `INSERT INTO asset (category, name, hostname, ip, manager)
+      `INSERT INTO asset (target_type, server_name, host_name, ip, manager)
        VALUES ($1, $2, $3, $4, $5)`,
       [category, name, hostname, ip, manager]
     );
@@ -513,11 +513,20 @@ app.post('/api/asset/bulk', async (req, res) => {
   try {
     const { assets } = req.body;
     if (!Array.isArray(assets)) return res.status(400).json({ error: '자산 배열이 필요합니다.' });
-    // DB에 일괄 등록 (예: MongoDB)
-    // await AssetModel.insertMany(assets);
-    // 또는 for (const asset of assets) { await AssetModel.create(asset); }
+
+    const values = [];
+    const placeholders = [];
+    assets.forEach((a, i) => {
+      placeholders.push(`($${i*5+1}, $${i*5+2}, $${i*5+3}, $${i*5+4}, $${i*5+5})`);
+      values.push(a.target_type, a.name, a.hostname, a.ip, a.manager);
+    });
+    await pool.query(
+      `INSERT INTO asset (target_type, server_name, host_name, ip, manager) VALUES ${placeholders.join(',')}`,
+      values
+    );
     res.json({ success: true });
   } catch (err) {
+    console.error('❌ 자산 일괄 등록 실패:', err.message);
     res.status(500).json({ error: 'DB 오류' });
   }
 });
@@ -525,7 +534,17 @@ app.post('/api/asset/bulk', async (req, res) => {
 // 자산 목록 조회
 app.get('/api/asset/list', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM asset ORDER BY id DESC');
+    const result = await pool.query(`
+      SELECT 
+        id, 
+        target_type AS category, 
+        server_name AS name, 
+        host_name AS hostname, 
+        ip, 
+        manager 
+      FROM asset 
+      ORDER BY id DESC
+    `);
     res.json(result.rows);
   } catch (err) {
     res.status(500).send('DB 조회 실패');
@@ -545,3 +564,15 @@ app.listen(port, () => {
 //vulnData.forEach((item, index) => {
  // console.log(`🧪 item[${index}]:`, item);
 //});
+app.post('/api/asset/check-duplicate', async (req, res) => {
+  const { target_type, name, hostname, ip } = req.body;
+  try {
+    const result = await pool.query(
+      `SELECT 1 FROM asset WHERE target_type=$1 AND server_name=$2 AND host_name=$3 AND ip=$4 LIMIT 1`,
+      [target_type, name, hostname, ip]
+    );
+    res.json({ exists: result.rowCount > 0 });
+  } catch (err) {
+    res.status(500).json({ error: 'DB 오류' });
+  }
+});
