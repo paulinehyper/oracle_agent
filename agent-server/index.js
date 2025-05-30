@@ -743,3 +743,28 @@ app.post('/api/login', async (req, res) => {
     res.status(500).json({ success: false, error: '서버 오류' });
   }
 });
+
+// 사용자 등록 API
+app.post('/api/register', async (req, res) => {
+  const { username, password, name, email, role } = req.body;
+  if (!username || !password || !name || !email || !role) {
+    return res.status(400).json({ success: false, error: '모든 항목을 입력하세요.' });
+  }
+  try {
+    // 중복 체크
+    const exists = await pool.query('SELECT 1 FROM users WHERE username = $1', [username]);
+    if (exists.rowCount > 0) {
+      return res.status(409).json({ success: false, error: '이미 존재하는 아이디입니다.' });
+    }
+    const hash = await bcrypt.hash(password, 10);
+    await pool.query(
+      `INSERT INTO users (username, password_hash, name, email, role, is_active, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, true, NOW(), NOW())`,
+      [username, hash, name, email, role]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('❌ 사용자 등록 오류:', err.message);
+    res.status(500).json({ success: false, error: '서버 오류' });
+  }
+});
