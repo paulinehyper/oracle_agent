@@ -263,8 +263,7 @@ app.post('/api/template', async (req, res) => {
   }
 });
 
-
-// 템플릿 항목 조회 (JOIN template_items for vulname, vul_info)
+// 템플릿 항목 조회 (JOIN template_vuln for vulname)
 app.get('/api/template/by-id/:templateid', async (req, res) => {
   try {
     const result = await pool.query(
@@ -273,9 +272,8 @@ app.get('/api/template/by-id/:templateid', async (req, res) => {
          r.templateid,
          r.templatename,
          r.host_name AS hostname,
-         t.item_id AS vulnid,
-         t.item_name AS vulname,
-         t.vul_info,
+         t.vul_id AS vulnid,
+         t.vul_name AS vulname,
          r.result,
          r.risk_level,
          r.risk_score,
@@ -287,7 +285,8 @@ app.get('/api/template/by-id/:templateid', async (req, res) => {
          r.service_status,
          CASE WHEN r.result = '양호' THEN r.vuln_score ELSE 0 END AS vuln_last_score
        FROM evaluation_results r
-       JOIN template_items t ON r.item_id = t.item_id
+       JOIN template_vuln t 
+         ON r.item_id = t.vul_id AND r.templateid::text = t.template_id::text
        WHERE r.templateid = $1
        ORDER BY r.id`,
       [req.params.templateid]
@@ -586,5 +585,91 @@ app.delete('/api/asset/:id', async (req, res) => {
   } catch (err) {
     console.error('❌ 자산 삭제 실패:', err.message);
     res.status(500).send('error');
+  }
+});
+
+// 템플릿별 점검 항목 목록 조회
+app.get('/api/template/:id/items', async (req, res) => {
+  const templateId = req.params.id;
+  try {
+    const result = await pool.query(
+      'SELECT vul_id, vul_name AS item_name FROM template_vuln WHERE template_id = $1 ORDER BY template_id',
+      [templateId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('템플릿 항목 불러오기 오류:', err);
+    res.status(500).json({ error: 'DB 오류' });
+  }
+});
+
+// 점검 시작 시 evaluation_results 미리 생성 API
+app.post('/api/evaluation/init', async (req, res) => {
+  const { assetId, templateId } = req.body;
+  if (!assetId || !templateId) {
+    return res.status(400).json({ error: 'assetId와 templateId가 필요합니다.' });
+  }
+
+  const client = await pool.connect();
+  try {
+    // 자산 정보 가져오기
+    const assetRes = await client.query(
+      'SELECT host_name FROM asset WHERE id = $1',
+      [assetId]
+    );
+    if (assetRes.rowCount === 0) {
+      return res.status(404).json({ error: '자산을 찾을 수 없습니다.' });
+    }
+    const asset = assetRes.rows[0];
+
+    // 템플릿명 가져오기 (필요시)
+    const tmplRes = await client.query(
+      'SELECT template_name FROM template WHERE template_id = $1',
+      [templateId]
+    );
+    const templatename = tmplRes.rows[0]?.template_name || '';
+
+    // 템플릿 항목 가져오기
+    const itemsRes = await client.query(
+      'SELECT vul_id, vul_name FROM template_vuln WHERE template_id = $1',
+      [templateId]
+    );
+    if (itemsRes.rowCount === 0) {
+      return res.status(404).json({ error: '템플릿 항목이 없습니다.' });
+    }
+
+    await client.query('BEGIN');
+    for (const item of itemsRes.rows) {
+      // 이미 존재하는지 확인 (중복 방지)
+      const existsRes = await client.query(
+        `SELECT 1 FROM evaluation_results 
+         WHERE templateid = $1 AND item_id = $2 AND host_name = $3`,
+        [templateId, item.vul_id, asset.host_name]
+      );
+      if (existsRes.rowCount === 0) {
+        await client.query(
+          `INSERT INTO evaluation_results (
+            templateid, templatename, item_id, host_name, result, risk_level, checked_by_agent
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [
+            templateId,
+            templatename,
+            item.vul_id,
+            asset.host_name,
+            '미점검',
+            '중',
+            false
+          ]
+        );
+      }
+    }
+    await client.query('COMMIT');
+    res.json({ success: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('❌ evaluation_results 미리 생성 실패:', err.message);
+    res.status(500).json({ error: 'DB 오류' });
+  } finally {
+    client.release();
   }
 });

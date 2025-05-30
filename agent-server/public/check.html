@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>점검</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 900px;
+      margin: auto;
+    }
+    h1 {
+      margin-bottom: 20px;
+    }
+
+    /* 🏠 고정 홈 버튼 */
+    #homeButton {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 1000;
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(200, 200, 200, 0.4);
+      padding: 8px 14px;
+      border-radius: 10px;
+      font-weight: 600;
+      color: #333;
+      text-decoration: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      transition: all 0.2s ease-in-out;
+    }
+
+    #homeButton:hover {
+      background: rgba(255, 255, 255, 0.9);
+      box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+
+    th, td {
+      padding: 8px;
+      border: 1px solid #ccc;
+      text-align: center;
+    }
+
+    th {
+      background-color: #f3f3f3;
+    }
+
+    .status {
+      font-weight: bold;
+    }
+
+    .양호 { color: green; }
+    .취약 { color: red; }
+    .미점검 { color: gray; }
+    .점검중 { color: orange; }
+
+    button {
+      padding: 4px 8px;
+      margin: 2px;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 10;
+      left: 0; top: 0;
+      width: 100%; height: 100%;
+      background-color: rgba(0,0,0,0.5);
+    }
+
+    .modal-content {
+      background-color: white;
+      margin: 15% auto;
+      padding: 20px;
+      width: 80%;
+      max-width: 600px;
+      border-radius: 8px;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <a href="/index.html" id="homeButton">🏠 홈으로</a>
+  <h1>🧪 점검 항목 목록</h1>
+  <p id="templateInfo">템플릿 정보를 불러오는 중...</p>
+  <button onclick="runAllChecks()" style="margin-top: 10px;">🔁 전체 점검</button>
+
+  <table id="resultTable" style="display: none;">
+    <thead>
+      <tr>
+        <th>Vuln ID</th>
+        <th>Vuln Name</th>
+        <th>위험도</th>
+        <th>Result</th>
+        <th>상세설명</th>
+        <th>서비스</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <div id="detailModal" class="modal">
+    <div class="modal-content" id="detailContent"></div>
+  </div>
+
+  <script>
+    function getQueryParam(param) {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get(param);
+    }
+
+    const templateid = getQueryParam("templateid");
+
+    if (!templateid) {
+      document.getElementById("templateInfo").textContent = "❌ templateid가 제공되지 않았습니다.";
+    } else {
+      fetch(`/api/template/by-id/${templateid}`)
+        .then(res => res.json())
+        .then(data => {
+          const table = document.getElementById('resultTable');
+          const tbody = table.querySelector('tbody');
+
+          if (data.length === 0) {
+            document.getElementById("templateInfo").textContent = "⚠️ 해당 템플릿에 대한 항목이 없습니다.";
+            return;
+          }
+
+          document.getElementById("templateInfo").textContent =
+            `템플릿 이름: ${data[0].templatename} / 호스트: ${data[0].hostname} / IP: ${data[0].ip || 'N/A'}`;
+
+          data.forEach(row => {
+            const resultClass = getStatusClass(row.result);
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td>${row.vulnid}</td>
+              <td>${row.vulname}</td>
+              <td>${renderRiskGrade(row.risk_grade)}</td>
+              <td class="status ${resultClass}" id="status-${row.id}">${row.result}</td>
+              <td>${row.vul_info ? row.vul_info.replace(/</g, '&lt;').replace(/>/g, '&gt;') : ''}</td>
+              <td id="service-${row.id}">${row.service_status || 'N/A'}</td>
+              <td id="action-${row.id}">
+                <button onclick="runCheck(${row.id}, '${row.vulnid}', '${row.hostname}')">점검</button>
+                ${row.detail ? `<button onclick="showDetail(\`${row.detail.replace(/`/g, '\\`')}\`)">상세</button>` : ''}
+              </td>
+            `;
+            tbody.appendChild(tr);
+          });
+
+          table.style.display = "table";
+        })
+        .catch(err => {
+          document.getElementById("templateInfo").textContent = "❌ 항목 조회 실패: " + err;
+        });
+    }
+
+    function getStatusClass(result) {
+      if (result.includes("점검 중")) return "점검중";
+      if (result.includes("양호")) return "양호";
+      if (result.includes("취약")) return "취약";
+      return "미점검";
+    }
+
+    function renderRiskGrade(grade) {
+      const stars = '★'.repeat(grade) + '☆'.repeat(5 - grade);
+      return `<span title="위험도 ${grade}/5">${stars} (${grade})</span>`;
+    }
+
+    function runCheck(id, vulnid, hostname) {
+      const statusCell = document.getElementById(`status-${id}`);
+      statusCell.textContent = "⏳ 점검 중...";
+      statusCell.className = "status 점검중";
+
+      fetch('/api/send-command', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, vulnid, hostname })
+      }).then(() => {
+        setTimeout(() => {
+          fetch(`/api/template/by-id/${getQueryParam("templateid")}`)
+            .then(res => res.json())
+            .then(data => {
+              const updated = data.find(row => row.id === id);
+              if (updated) {
+                const newClass = getStatusClass(updated.result);
+                const statusEl = document.getElementById(`status-${id}`);
+                statusEl.textContent = updated.result;
+                statusEl.className = `status ${newClass}`;
+                if (updated.detail) {
+                  statusEl.title = updated.detail;
+                }
+
+                document.getElementById(`service-${id}`).textContent = updated.service_status || 'N/A';
+
+                const actionCell = document.getElementById(`action-${id}`);
+                actionCell.innerHTML = `
+                  <button onclick="runCheck(${id}, '${vulnid}', '${hostname}')">점검</button>
+                  <button onclick="showDetail(\`${updated.detail.replace(/`/g, '\\`')}\`)">상세</button>
+                `;
+              }
+            });
+        }, 4000);
+      }).catch(err => {
+        statusCell.textContent = "❌ 점검 요청 실패";
+        statusCell.className = "status";
+        console.error(err);
+      });
+    }
+
+    function runAllChecks() {
+      fetch(`/api/template/by-id/${getQueryParam("templateid")}`)
+        .then(res => res.json())
+        .then(data => {
+          const delay = 1500;
+          data.forEach((row, index) => {
+            setTimeout(() => {
+              runCheck(row.id, row.vulnid, row.hostname);
+            }, index * delay);
+          });
+        })
+        .catch(err => {
+          alert("❌ 전체 점검 실패: " + err);
+        });
+    }
+
+    function showDetail(detailText) {
+      document.getElementById("detailContent").textContent = detailText;
+      document.getElementById("detailModal").style.display = "block";
+    }
+
+    window.onclick = function(event) {
+      const modal = document.getElementById("detailModal");
+      if (event.target === modal) {
+        modal.style.display = "none";
+      }
+    }
+  </script>
+</body>
+</html>

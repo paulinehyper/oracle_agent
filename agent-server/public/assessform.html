@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>자산 점검 시작</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .container {
+      max-width: 700px;
+      margin: 40px auto;
+      padding: 20px;
+    }
+    label {
+      display: block;
+      margin-top: 16px;
+      font-weight: bold;
+    }
+    select, button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 8px;
+      font-size: 16px;
+    }
+    .btn-add {
+      background-color: #00b894;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      margin-top: 20px;
+      cursor: pointer;
+    }
+    .btn-add:hover {
+      background-color: #019875;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: left;
+    }
+    th {
+      background-color: #f0f0f0;
+    }
+    #selectedAsset {
+      background: #f9f9f9;
+      border: 1px solid #ccc;
+      padding: 12px;
+      margin-top: 10px;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="nav-inner">
+      <div class="nav-title">
+        <a href="/">자산관리시스템</a>
+      </div>
+      <nav class="nav-menu">
+        <a href="/">홈</a>
+        <a href="/assetlist.html">자산 목록</a>
+        <a href="/registerasset.html">자산 등록</a>
+        <a href="/templatelist.html">템플릿 목록</a>
+        <a href="/newtemplate.html">새 템플릿 등록</a>
+        <a href="/assessform.html">자산 점검</a>
+      </nav>
+    </div>
+  </header>
+
+  <div class="container">
+    <h2>자산 점검 시작</h2>
+    <form id="assessForm">
+      <label for="assetSelect">자산 선택</label>
+      <select id="assetSelect" name="asset" required>
+        <option value="">-- 자산을 선택하세요 --</option>
+      </select>
+
+      <label for="templateSelect">템플릿 선택</label>
+      <select id="templateSelect" name="template">
+        <option value="">-- 템플릿을 선택하세요 --</option>
+        <!-- 템플릿 목록은 JS에서 동적으로 채움 -->
+      </select>
+
+      <button type="submit" class="btn btn-add">점검 시작</button>
+    </form>
+
+    <div id="selectedInfo" style="margin-top: 30px;">
+      <h3>선택한 자산</h3>
+      <div id="selectedAsset">선택된 자산 없음</div>
+
+      <h3 style="margin-top:20px;">템플릿 점검 항목</h3>
+      <div id="templateItems" style="margin-top:24px;">
+        <!-- 점검 항목 표가 여기에 표시됨 -->
+      </div>
+    </div>
+
+    <div id="status" style="margin-top: 24px; font-weight: bold;"></div>
+  </div>
+
+  <script>
+  let assetMap = {};
+
+  async function loadAssets() {
+    const res = await fetch('/api/asset/list');
+    const assets = await res.json();
+    const select = document.getElementById('assetSelect');
+    assets.forEach(a => {
+      assetMap[a.id] = a;
+      const option = document.createElement('option');
+      option.value = a.id;
+      option.textContent = `${a.name} (${a.hostname}, ${a.ip})`;
+      select.appendChild(option);
+    });
+  }
+
+  async function loadTemplates() {
+    const res = await fetch('/api/template/list');
+    const templates = await res.json();
+    const select = document.getElementById('templateSelect');
+    templates.forEach(t => {
+      const option = document.createElement('option');
+      option.value = t.template_id;
+      option.textContent = `${t.template_name} [${t.target_type}]`;
+      select.appendChild(option);
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    loadAssets();
+    loadTemplates();
+
+    document.getElementById('templateSelect').addEventListener('change', async function () {
+      const templateId = this.value;
+      const assetId = document.getElementById('assetSelect').value;
+
+      // 자산 정보 표시
+      if (assetId && assetMap[assetId]) {
+        const a = assetMap[assetId];
+        document.getElementById('selectedAsset').innerHTML = `
+          <strong>${a.name}</strong><br>
+          호스트네임: ${a.hostname}<br>
+          IP: ${a.ip}<br>
+          관리자: ${a.manager || '-'}
+        `;
+      }
+
+      if (!templateId) return;
+
+      // 점검 항목 불러오기
+      try {
+        const res = await fetch(`/api/template/${templateId}/items`);
+        const items = await res.json();
+        const itemsArea = document.getElementById('templateItems');
+        if (items.length === 0) {
+          itemsArea.innerHTML = '<div class="empty">점검 항목이 없습니다.</div>';
+          return;
+        }
+        itemsArea.innerHTML = `
+          <table>
+            <thead>
+              <tr>
+                <th>항목명</th>
+                <th>설명</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.map(i => `
+                <tr>
+                  <td>${i.item_name || '-'}</td>
+                  <td>${i.description || '-'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+      } catch (err) {
+        document.getElementById('templateItems').innerHTML = '<div class="empty">점검 항목을 불러오지 못했습니다.</div>';
+        console.error('템플릿 항목 로딩 실패:', err);
+      }
+    });
+
+    // 점검 시작 버튼 클릭 시 evaluation_results 미리 생성 후 페이지 이동
+    document.getElementById('assessForm').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      const assetId = document.getElementById('assetSelect').value;
+      const templateId = document.getElementById('templateSelect').value;
+
+      if (!assetId || !templateId) {
+        document.getElementById('status').textContent = '자산과 템플릿을 모두 선택하세요.';
+        return;
+      }
+
+      // 1. 점검 결과 미리 생성 요청
+      try {
+        const res = await fetch('/api/evaluation/init', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ assetId, templateId })
+        });
+        if (!res.ok) {
+          document.getElementById('status').textContent = '점검 결과 생성에 실패했습니다.';
+          return;
+        }
+      } catch (err) {
+        document.getElementById('status').textContent = '점검 결과 생성 중 오류가 발생했습니다.';
+        return;
+      }
+
+      // 2. 점검용 페이지로 이동 (templateid 전달)
+      window.location.href = `/check.html?templateid=${templateId}`;
+    });
+  });
+  </script>
+</body>
+</html>
