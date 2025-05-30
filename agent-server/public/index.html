@@ -35,5 +35,13 @@
   <footer>
     © 2025 보안 점검 시스템 — All rights reserved.
   </footer>
+  <script>
+    // If not logged in, redirect to login page
+    if (!sessionStorage.getItem('username')) {
+      if (!location.pathname.endsWith('/login.html')) {
+        location.href = '/login.html';
+      }
+    }
+  </script>
 </body>
 </html>

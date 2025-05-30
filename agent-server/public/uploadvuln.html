@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>취약점 목록 업로드</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f5f9ff;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 500px;
+      margin: 60px auto;
+      padding: 30px;
+      background-color: white;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+      border-radius: 12px;
+      text-align: center;
+    }
+    h2 {
+      color: #0056b3;
+      margin-bottom: 30px;
+    }
+    input[type="file"] {
+      margin: 20px 0;
+      padding: 10px;
+    }
+    button {
+      padding: 12px 30px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      font-size: 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    .status {
+      margin-top: 20px;
+      font-weight: bold;
+      color: #d00;
+    }
+    .success {
+      color: #007b00;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>취약점 목록 CSV 업로드</h2>
+    <form id="uploadForm">
+      <input type="file" id="csvfile" name="csvfile" accept=".csv" required />
+      <br>
+      <button type="submit">업로드</button>
+    </form>
+    <div id="status" class="status"></div>
+  </div>
+  <script>
+    document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const status = document.getElementById('status');
+      status.textContent = '';
+      const fileInput = document.getElementById('csvfile');
+      if (!fileInput.files.length) {
+        status.textContent = 'CSV 파일을 선택하세요.';
+        return;
+      }
+      const formData = new FormData();
+      formData.append('csvfile', fileInput.files[0]);
+      try {
+        const res = await fetch('/upload', {
+          method: 'POST',
+          body: formData
+        });
+        if (res.ok) {
+          status.textContent = '✅ 업로드 및 저장이 완료되었습니다.';
+          status.className = 'status success';
+        } else {
+          const msg = await res.text();
+          status.textContent = '❌ 업로드 실패: ' + msg;
+          status.className = 'status';
+        }
+      } catch (err) {
+        status.textContent = '❌ 네트워크 오류';
+        status.className = 'status';
+      }
+    });
+  </script>
+</body>
+</html>

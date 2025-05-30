@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>로그인</title>
+  <style>
+    body {
+      background: #f5f9ff;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+    .login-container {
+      max-width: 350px;
+      margin: 100px auto;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+      padding: 40px 30px 30px 30px;
+      text-align: center;
+    }
+    h2 {
+      color: #0056b3;
+      margin-bottom: 30px;
+    }
+    input[type="text"], input[type="password"] {
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0 20px 0;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 15px;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      font-size: 16px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    .status {
+      margin-top: 18px;
+      color: #d00;
+      font-weight: bold;
+      min-height: 24px;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <h2>로그인</h2>
+    <form id="loginForm">
+      <input type="text" id="username" placeholder="아이디" required />
+      <input type="password" id="password" placeholder="비밀번호" required />
+      <button type="submit">로그인</button>
+    </form>
+    <div class="status" id="status"></div>
+  </div>
+  <script>
+    document.getElementById('loginForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const status = document.getElementById('status');
+      status.textContent = '';
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value.trim();
+      if (!username || !password) {
+        status.textContent = '아이디와 비밀번호를 입력하세요.';
+        return;
+      }
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          // 예시: 세션에 역할 저장
+          sessionStorage.setItem('username', data.username);
+          sessionStorage.setItem('role', data.role); // 'admin' 또는 'user'
+          window.location.href = '/';
+        } else {
+          status.textContent = data.error || '로그인 실패';
+        }
+      } catch (err) {
+        status.textContent = '네트워크 오류';
+      }
+    });
+  </script>
+</body>
+</html>
