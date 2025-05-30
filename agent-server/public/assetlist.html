@@ -29,18 +29,36 @@
     <table id="assetTable">
       <thead>
         <tr>
-          <th>자산 분류</th>
-          <th>자산 이름</th>
+          <th>카테고리</th>
+          <th>이름</th>
           <th>호스트네임</th>
-          <th>IP 주소</th>
-          <th>관리자</th>
-          <th>삭제</th>
+          <th>IP</th>
+          <th>담당자</th>
+          <th>수정</th>
+          <th>삭제</th> <!-- 삭제 컬럼 추가 -->
         </tr>
       </thead>
-      <tbody>
-        <!-- 데이터 삽입 영역 -->
+      <tbody id="assetTbody">
+        <!-- JS로 채움 -->
       </tbody>
     </table>
+  </div>
+
+  <!-- 수정 모달 -->
+  <div id="editModal" style="display:none; position:fixed; left:0; top:0; width:100vw; height:100vh; background:rgba(0,0,0,0.3);">
+    <div style="background:#fff; margin:100px auto; padding:20px; width:300px; border-radius:8px;">
+      <h3>자산 정보 수정</h3>
+      <form id="editForm">
+        <input type="hidden" id="editId">
+        <label>카테고리 <input id="editCategory"></label><br>
+        <label>이름 <input id="editName"></label><br>
+        <label>호스트네임 <input id="editHostname"></label><br>
+        <label>IP <input id="editIp"></label><br>
+        <label>담당자 <input id="editManager"></label><br>
+        <button type="submit">저장</button>
+        <button type="button" onclick="closeModal()">취소</button>
+      </form>
+    </div>
   </div>
 
   <script>
@@ -68,9 +86,8 @@
           <td>${asset.hostname}</td>
           <td>${asset.ip}</td>
           <td>${asset.manager || ''}</td>
-          <td>
-            <button class="btn-delete" onclick="deleteAsset(${asset.id}, '${asset.ip}', '${asset.hostname}')">🗑 삭제</button>
-          </td>
+          <td><button onclick="openEditModal(${asset.id}, '${asset.category}', '${asset.name}', '${asset.hostname}', '${asset.ip}', '${asset.manager || ''}')">수정</button></td>
+          <td><button onclick="deleteAsset(${asset.id}, '${asset.ip}', '${asset.hostname}')">삭제</button></td>
         `;
         tbody.appendChild(tr);
       });
@@ -105,7 +122,41 @@
       }
     }
 
-    fetchAssets();
+    function openEditModal(id, category, name, hostname, ip, manager) {
+      document.getElementById('editId').value = id;
+      document.getElementById('editCategory').value = category;
+      document.getElementById('editName').value = name;
+      document.getElementById('editHostname').value = hostname;
+      document.getElementById('editIp').value = ip;
+      document.getElementById('editManager').value = manager;
+      document.getElementById('editModal').style.display = 'block';
+    }
+
+    function closeModal() {
+      document.getElementById('editModal').style.display = 'none';
+    }
+
+    document.getElementById('editForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const id = document.getElementById('editId').value;
+      const data = {
+        category: document.getElementById('editCategory').value,
+        name: document.getElementById('editName').value,
+        hostname: document.getElementById('editHostname').value,
+        ip: document.getElementById('editIp').value,
+        manager: document.getElementById('editManager').value
+      };
+      await fetch(`/api/asset/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      closeModal();
+      fetchAssets(); // 목록 자동 갱신
+    });
+
+    // 페이지 로드 시 자산 목록 표시
+    document.addEventListener('DOMContentLoaded', fetchAssets);
   </script>
 </body>
 </html>

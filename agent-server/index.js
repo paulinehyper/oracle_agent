@@ -272,6 +272,7 @@ app.get('/api/template/by-id/:templateid', async (req, res) => {
          r.templateid,
          r.templatename,
          r.host_name AS hostname,
+         a.ip AS ip, -- asset 테이블에서 IP 가져오기
          t.vul_id AS vulnid,
          t.vul_name AS vulname,
          r.result,
@@ -287,6 +288,8 @@ app.get('/api/template/by-id/:templateid', async (req, res) => {
        FROM evaluation_results r
        JOIN template_vuln t 
          ON r.item_id = t.vul_id AND r.templateid::text = t.template_id::text
+       LEFT JOIN asset a
+         ON r.host_name = a.host_name
        WHERE r.templateid = $1
        ORDER BY r.id`,
       [req.params.templateid]
@@ -615,6 +618,24 @@ app.get('/api/template/:id/items', async (req, res) => {
   } catch (err) {
     console.error('템플릿 항목 불러오기 오류:', err);
     res.status(500).json({ error: 'DB 오류' });
+  }
+});
+// PATCH /api/asset/:id
+app.patch('/api/asset/:id', async (req, res) => {
+  const { id } = req.params;
+  const { category, name, hostname, ip, manager } = req.body;
+
+  try {
+    await pool.query(
+      `UPDATE asset
+       SET target_type = $1, server_name = $2, host_name = $3, ip = $4, manager = $5
+       WHERE id = $6`,
+      [category, name, hostname, ip, manager, id]
+    );
+    res.send('✅ 수정 완료');
+  } catch (err) {
+    console.error('❌ 자산 수정 실패:', err.message);
+    res.status(500).send('DB 오류');
   }
 });
 
