@@ -323,27 +323,42 @@ app.post('/api/result', async (req, res) => {
   }
 });
 
-// 점검 명령 전달
-let latestCommand = null;
+// 점검 명령 전달 (IP 포함)
 app.post('/api/send-command', async (req, res) => {
   const { id, vulnid, hostname } = req.body;
+
   try {
-    latestCommand = { id, vulnid, hostname };
+    // IP 가져오기
+    const assetRes = await pool.query(
+      `SELECT ip FROM asset WHERE host_name = $1 LIMIT 1`,
+      [hostname]
+    );
+
+    if (assetRes.rowCount === 0) {
+      return res.status(404).json({ error: '자산 IP를 찾을 수 없습니다.' });
+    }
+
+    const ip = assetRes.rows[0].ip;
+
+    latestCommand = { id, vulnid, hostname, ip };
+
     await pool.query(
       `UPDATE evaluation_results
        SET result = '점검 중', last_checked_at = NOW(), checked_by_agent = false
        WHERE id = $1`, [id]
     );
-    res.sendStatus(200);
+
+    res.status(200).json({ message: '✅ 명령 저장 완료', ip });
   } catch (err) {
     console.error('❌ 점검 명령 전달 실패:', err.message);
     res.status(500).send('점검 처리 실패');
   }
 });
 
+// 점검 명령 조회 (IP 포함)
 app.get('/api/command', (req, res) => {
   if (latestCommand) {
-    res.json(latestCommand);
+    res.json(latestCommand); // 여기에는 ip가 포함되어 있음
     latestCommand = null;
   } else {
     res.status(204).send();
