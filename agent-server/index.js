@@ -6,9 +6,11 @@ const multer = require('multer');
 const csv = require('csv-parser');
 const fs = require('fs');
 const { Pool } = require('pg');
+const bcrypt = require('bcrypt');
 const upload = multer({ dest: 'uploads/' });
 
-
+// 여기에 추가!
+let latestCommand = null;
 // PostgreSQL 연결 설정
 const pool = new Pool({
   user: 'goagent',
@@ -707,5 +709,37 @@ app.post('/api/evaluation/init', async (req, res) => {
     res.status(500).json({ error: 'DB 오류' });
   } finally {
     client.release();
+  }
+});
+
+// 로그인 API
+app.post('/api/login', async (req, res) => {
+  const { username, password } = req.body;
+  try {
+    // users 테이블에서 사용자 조회
+    const userRes = await pool.query(
+      'SELECT username, password_hash, role FROM users WHERE username = $1',
+      [username]
+    );
+    if (userRes.rowCount === 0) {
+      return res.status(401).json({ success: false, error: '존재하지 않는 사용자입니다.' });
+    }
+    const user = userRes.rows[0];
+
+    // 비밀번호 비교 (bcrypt)
+    const match = await bcrypt.compare(password, user.password_hash);
+    if (!match) {
+      return res.status(401).json({ success: false, error: '비밀번호가 일치하지 않습니다.' });
+    }
+
+    // 로그인 성공
+    res.json({
+      success: true,
+      username: user.username,
+      role: user.role // 'admin' 또는 'user'
+    });
+  } catch (err) {
+    console.error('❌ 로그인 오류:', err.message);
+    res.status(500).json({ success: false, error: '서버 오류' });
   }
 });
