@@ -143,6 +143,13 @@
     <form id="templateForm" class="form-section">
       <label>진단 템플리트명:</label>
       <input type="text" name="templatename" required />
+
+      <label>자산 선택:</label>
+      <select name="assetId" id="assetSelect" required>
+        <option value="">-- 자산을 선택하세요 --</option>
+        <!-- JS로 자산 목록 옵션이 동적으로 추가됩니다 -->
+      </select>
+
       <label>평가기반:</label>
       <div class="checkbox-group">
         <label><input type="checkbox" name="basisType" value="전자금육" checked /> 전자금육</label>
@@ -201,6 +208,7 @@
       });
     }
 
+    // vulnerability 테이블에서 목록을 불러오도록 fetch 경로 수정
     async function fetchVulnList() {
       const targetType = document.querySelector('select[name="targetType"]').value;
       const basisTypes = Array.from(document.querySelectorAll('input[name="basisType"]:checked')).map(cb => cb.value);
@@ -210,7 +218,8 @@
       if (basisTypes.length) query.append('basisFilter', basisTypes.join(','));
       if (subTargets.length) query.append('subTargets', subTargets.join(','));
 
-      const res = await fetch(`/api/vulnerability?${query.toString()}`);
+      // API 경로를 vulnerability 테이블에 맞게 수정
+      const res = await fetch(`/vulnerability?${query.toString()}`);
       const tbody = document.getElementById("vulnTableBody");
       tbody.innerHTML = "";
       if (!res.ok) {
@@ -222,10 +231,10 @@
         const tr = document.createElement("tr");
         tr.innerHTML = `
           <td><input type="checkbox" name="vulnCheck" value="${index}" checked></td>
-          <td>${item.vulnid}</td>
-          <td>${item.vulname}</td>
+          <td>${item.vul_id || item.vulnid}</td>
+          <td>${item.vul_name || item.vulname}</td>
           <td>${item.risk_level}</td>
-          <td>${item.targetSystem}</td>
+          <td>${item.target_system || item.targetSystem}</td>
           <td>${item.basis}</td>
         `;
         tbody.appendChild(tr);
@@ -244,7 +253,28 @@
       }
     });
 
+    // 자산 목록 불러오기 및 select에 추가
+    async function loadAssetList() {
+      const select = document.getElementById('assetSelect');
+      try {
+        const res = await fetch('/api/asset/list');
+        if (!res.ok) throw new Error();
+        const assets = await res.json();
+        assets.forEach(asset => {
+          const option = document.createElement('option');
+          option.value = asset.asset_id || asset.id;
+          option.textContent = asset.asset_name || asset.name || asset.id;
+          select.appendChild(option);
+        });
+      } catch {
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = '자산 목록을 불러올 수 없습니다';
+        select.appendChild(option);
+      }
+    }
     window.addEventListener('DOMContentLoaded', () => {
+      loadAssetList();
       fetchVulnList();
     });
 
@@ -259,7 +289,9 @@
       const status = document.getElementById('status');
       status.textContent = '';
 
-      let template_name = document.querySelector('input[name="templatename"]').value.trim();
+      // 입력값 수집
+      const template_name = document.querySelector('input[name="templatename"]')?.value?.trim() || '';
+      const asset_id = document.getElementById('assetSelect').value;
       const target_type = document.querySelector('select[name="targetType"]').value;
       const basis_type = Array.from(document.querySelectorAll('input[name="basisType"]:checked')).map(cb => cb.value).join(',');
       const vulns = Array.from(document.querySelectorAll('input[name="vulnCheck"]:checked')).map(cb => {
@@ -270,21 +302,44 @@
         };
       });
 
-      if (!template_name || !target_type || !basis_type || vulns.length === 0) {
+      if (!template_name || !asset_id || !target_type || !basis_type || vulns.length === 0) {
         status.textContent = "❗ 모든 항목을 입력하세요.";
         return;
       }
 
-      const isDuplicate = await checkDuplicateTemplateName(template_name);
-      if (isDuplicate) {
-        status.textContent = "❗ 동일한 템플릿명이 존재합니다.";
+      // 1. 자산 상세 정보 불러오기
+      let assetInfo = {};
+      try {
+        const assetRes = await fetch(`/api/asset/${asset_id}`);
+        if (assetRes.ok) {
+          const asset = await assetRes.json();
+          assetInfo = {
+            asset_name: asset.server_name || '',      // asset 테이블의 server_name → template.asset_name
+            asset_hostname: asset.host_name || '',    // asset 테이블의 host_name → template.asset_hostname
+            asset_ip: asset.ip || '',                 // asset 테이블의 ip → template.asset_ip
+            asset_manager: asset.manager || '',       // asset 테이블의 manager → template.asset_manager
+          };
+        } else {
+          status.textContent = "❗ 자산 정보를 불러올 수 없습니다.";
+          return;
+        }
+      } catch {
+        status.textContent = "❗ 자산 정보를 불러올 수 없습니다.";
         return;
       }
 
+      // 2. 템플릿 저장 요청에 자산 정보 포함
       const res = await fetch('/api/template', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ template_name, target_type, basis_type, vulns })
+        body: JSON.stringify({
+          template_name,
+          asset_id,
+          target_type,
+          basis_type,
+          vulns,
+          ...assetInfo // asset_name, asset_hostname, asset_ip, asset_manager 포함
+        })
       });
 
       if (res.ok) {

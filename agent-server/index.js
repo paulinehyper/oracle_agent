@@ -71,6 +71,7 @@ app.post('/api/template', async (req, res) => {
 
 // POST /api/template
 // 템플릿 저장 (자동 생성된 template_id 사용)
+/*
 app.post('/api/template', async (req, res) => {
   const { template_name, target_type, basis_type, vulns } = req.body;
   const client = await pool.connect();
@@ -107,15 +108,23 @@ app.post('/api/template', async (req, res) => {
   }
 });
 
-
+*/
 
 app.get('/api/template/list', async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT t.template_id, t.template_name, t.target_type, t.basis_type, COUNT(v.id) AS vuln_count
+      SELECT 
+        t.template_id, 
+        t.template_name, 
+        t.target_type, 
+        t.basis_type, 
+        t.asset_name,         -- 반드시 포함!
+        t.asset_ip,           -- 반드시 포함!
+        t.asset_manager,      -- 반드시 포함!
+        COUNT(v.id) AS vuln_count
       FROM template t
       LEFT JOIN template_vuln v ON t.template_id::text = v.template_id
-      GROUP BY t.template_id, t.template_name, t.target_type, t.basis_type
+      GROUP BY t.template_id, t.template_name, t.target_type, t.basis_type, t.asset_name, t.asset_ip, t.asset_manager
       ORDER BY t.created_at DESC
     `);
 
@@ -242,28 +251,7 @@ app.post('/upload', upload.single('csvfile'), (req, res) => {
 
 
 
-// 템플릿 항목 일괄 저장
-// Node.js + Express 예시
-app.post('/api/template', async (req, res) => {
-  const { templatename, targetType, basisType } = req.body;
 
-  try {
-    await pool.query(
-      `INSERT INTO template (template_id, template_name, target_type, basis_type)
-       VALUES ($1, $2, $3, $4)`,
-      [
-        `tmpl_${Date.now()}`,  // 간단한 ID 생성 예시
-        templatename,
-        targetType,
-        basisType.join(',')    // 배열을 문자열로 변환
-      ]
-    );
-    res.status(200).send('✅ 등록 완료');
-  } catch (err) {
-    console.error('❌ 템플릿 등록 실패:', err.message);
-    res.status(500).send('등록 중 오류 발생');
-  }
-});
 
 // 템플릿 항목 조회 (JOIN template_vuln for vulname)
 app.get('/api/template/by-id/:templateid', async (req, res) => {
@@ -302,7 +290,6 @@ app.get('/api/template/by-id/:templateid', async (req, res) => {
     res.status(500).send('DB 조회 실패');
   }
 });
-
 
 // 점검 결과 저장
 app.post('/api/result', async (req, res) => {
@@ -405,109 +392,27 @@ app.get('/api/template/summary/all', async (req, res) => {
 
 
 
-app.get('/api/vulnerability', async (req, res) => {
-  const { targetType, basisFilter, subTargets } = req.query;
-
+// 취약점 목록 조회 API
+app.get('/vulnerability', async (req, res) => {
   try {
-    const result = await pool.query(`
-      SELECT 
-        vul_id, vul_name, category, control_area,
-        control_type_large, control_type_medium,
-        risk_level, details,
-        basis_financial, basis_critical_info,
-        target_aix, target_hp_ux, target_linux,
-        target_solaris, target_win, target_webservice,
-        target_apache, target_webtob, target_iis,
-        target_tomcat, target_jeus,
-        target_type
+    const result = await pool.query(
+      `SELECT 
+        vul_id, 
+        category, 
+        vul_name, 
+        CASE
+          WHEN basis_financial = 'Y' AND basis_critical_info = 'Y' THEN '전자금융, 주요정보'
+          WHEN basis_financial = 'Y' THEN '전자금융'
+          WHEN basis_critical_info = 'Y' THEN '주요정보'
+          ELSE ''
+        END AS basis
       FROM vulnerability
-      ORDER BY vul_id
-    `);
-
-    const filtered = result.rows.filter(row => {
-      let targetMatch = true;
-      let basisMatch = true;
-      let subTargetMatch = true;
-
-      // 평가대상 상위 필터
-      if (targetType) {
-        targetMatch = row.target_type?.toLowerCase() === targetType.toLowerCase();
-      }
-
-if (basisFilter) {
-  const filters = basisFilter.split(',').map(f => f.trim()).filter(f => f !== '');
-
-  if (filters.length === 0) {
-    basisMatch = false; // ✅ 둘 다 체크 해제되었을 때는 아무것도 매칭 안 됨
-  } else if (filters.includes('전자금융') && !filters.includes('주요정보')) {
-    basisMatch = row.basis_financial === 'o';
-  } else if (!filters.includes('전자금융') && filters.includes('주요정보')) {
-    basisMatch = row.basis_critical_info === 'o';
-  } else if (filters.includes('전자금융') && filters.includes('주요정보')) {
-    basisMatch = row.basis_financial === 'o' || row.basis_critical_info === 'o';
-  }
-}
-
-
-
-      // 하위 대상 필터
-      if (subTargets) {
-        const targetFields = {
-          'AIX': row.target_aix,
-          'HP-UX': row.target_hp_ux,
-          'LINUX': row.target_linux,
-          'SOLARIS': row.target_solaris,
-          'WIN': row.target_win,
-          '웹서비스': row.target_webservice,
-          'Apache': row.target_apache,
-          'WebtoB': row.target_webtob,
-          'IIS': row.target_iis,
-          'Tomcat': row.target_tomcat,
-          'JEUS': row.target_jeus
-        };
-        const subTargetList = subTargets.split(',').map(s => s.trim());
-        subTargetMatch = subTargetList.some(key => targetFields[key] === 'o');
-      }
-
-      return targetMatch && basisMatch && subTargetMatch;
-    });
-
-    const response = filtered.map(row => {
-      const targets = [];
-      if (row.target_aix === 'o') targets.push('AIX');
-      if (row.target_hp_ux === 'o') targets.push('HP-UX');
-      if (row.target_linux === 'o') targets.push('LINUX');
-      if (row.target_solaris === 'o') targets.push('SOLARIS');
-      if (row.target_win === 'o') targets.push('WIN');
-      if (row.target_webservice === 'o') targets.push('웹서비스');
-      if (row.target_apache === 'o') targets.push('Apache');
-      if (row.target_webtob === 'o') targets.push('WebtoB');
-      if (row.target_iis === 'o') targets.push('IIS');
-      if (row.target_tomcat === 'o') targets.push('Tomcat');
-      if (row.target_jeus === 'o') targets.push('JEUS');
-
-      const basisArr = [];
-      if (row.basis_financial === 'o') basisArr.push('전자금융');
-      if (row.basis_critical_info === 'o') basisArr.push('주요정보');
-
-      return {
-        vulnid: row.vul_id,
-        vulname: row.vul_name,
-        category: row.category,
-        control_area: row.control_area,
-        control_type_large: row.control_type_large,
-        control_type_medium: row.control_type_medium,
-        risk_level: row.risk_level,
-        details: row.details,
-        targetSystem: targets.join(', '),
-        basis: basisArr.join(', ')
-      };
-    });
-
-    res.json(response);
+      ORDER BY vul_id`
+    );
+    res.json(result.rows);
   } catch (err) {
-    console.error('❌ vulnerability 조회 실패:', err.message);
-    res.status(500).send('DB 조회 실패');
+    console.error('❌ 취약점 목록 조회 오류:', err.message);
+    res.status(500).send('DB 오류');
   }
 });
 
@@ -608,163 +513,68 @@ app.delete('/api/asset/:id', async (req, res) => {
   }
 });
 
-// 템플릿별 점검 항목 목록 조회
-app.get('/api/template/:id/items', async (req, res) => {
-  const templateId = req.params.id;
-  try {
-    const result = await pool.query(
-      'SELECT vul_id, vul_name AS item_name FROM template_vuln WHERE template_id = $1 ORDER BY template_id',
-      [templateId]
-    );
-    res.json(result.rows);
-  } catch (err) {
-    console.error('템플릿 항목 불러오기 오류:', err);
-    res.status(500).json({ error: 'DB 오류' });
-  }
-});
-// PATCH /api/asset/:id
-app.patch('/api/asset/:id', async (req, res) => {
+// 자산 상세 조회
+app.get('/api/asset/:id', async (req, res) => {
   const { id } = req.params;
-  const { category, name, hostname, ip, manager } = req.body;
-
   try {
-    await pool.query(
-      `UPDATE asset
-       SET target_type = $1, server_name = $2, host_name = $3, ip = $4, manager = $5
-       WHERE id = $6`,
-      [category, name, hostname, ip, manager, id]
-    );
-    res.send('✅ 수정 완료');
+    const result = await pool.query('SELECT * FROM asset WHERE id = $1', [id]);
+    if (result.rows.length === 0) return res.status(404).send('Not found');
+    res.json(result.rows[0]);
   } catch (err) {
-    console.error('❌ 자산 수정 실패:', err.message);
+    console.error('❌ 자산 상세 조회 실패:', err.message);
     res.status(500).send('DB 오류');
   }
 });
 
-// 점검 시작 시 evaluation_results 미리 생성 API
-app.post('/api/evaluation/init', async (req, res) => {
-  const { assetId, templateId } = req.body;
-  if (!assetId || !templateId) {
-    return res.status(400).json({ error: 'assetId와 templateId가 필요합니다.' });
-  }
+// template 등록
+app.post('/api/template', async (req, res) => {
+  const {
+    template_name, asset_id, target_type, basis_type, vulns,
+    asset_name, asset_type, asset_ip, asset_hostname, asset_manager, description = ''
+  } = req.body;
 
   const client = await pool.connect();
   try {
-    // 자산 정보 가져오기
-    const assetRes = await client.query(
-      'SELECT host_name FROM asset WHERE id = $1',
-      [assetId]
-    );
-    if (assetRes.rowCount === 0) {
-      return res.status(404).json({ error: '자산을 찾을 수 없습니다.' });
-    }
-    const asset = assetRes.rows[0];
-
-    // 템플릿명 가져오기 (필요시)
-    const tmplRes = await client.query(
-      'SELECT template_name FROM template WHERE template_id = $1',
-      [templateId]
-    );
-    const templatename = tmplRes.rows[0]?.template_name || '';
-
-    // 템플릿 항목 가져오기
-    const itemsRes = await client.query(
-      'SELECT vul_id, vul_name FROM template_vuln WHERE template_id = $1',
-      [templateId]
-    );
-    if (itemsRes.rowCount === 0) {
-      return res.status(404).json({ error: '템플릿 항목이 없습니다.' });
-    }
-
     await client.query('BEGIN');
-    for (const item of itemsRes.rows) {
-      // 이미 존재하는지 확인 (중복 방지)
-      const existsRes = await client.query(
-        `SELECT 1 FROM evaluation_results 
-         WHERE templateid = $1 AND item_id = $2 AND host_name = $3`,
-        [templateId, item.vul_id, asset.host_name]
-      );
-      if (existsRes.rowCount === 0) {
+
+    // 템플릿 저장 (asset 정보 포함)
+    const result = await client.query(
+      `INSERT INTO template 
+        (template_name, asset_name, asset_type, asset_ip, asset_hostname, asset_manager, target_type, basis_type, description)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING template_id`,
+      [
+        template_name,
+        asset_name,
+        asset_type,
+        asset_ip,
+        asset_hostname,
+        asset_manager,
+        target_type,
+        basis_type,
+        description
+      ]
+    );
+    const newTemplateId = result.rows[0].template_id;
+
+    // 취약점 연결
+    if (Array.isArray(vulns)) {
+      for (const vuln of vulns) {
         await client.query(
-          `INSERT INTO evaluation_results (
-            templateid, templatename, item_id, host_name, result, risk_level, checked_by_agent
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-          [
-            templateId,
-            templatename,
-            item.vul_id,
-            asset.host_name,
-            '미점검',
-            '중',
-            false
-          ]
+          `INSERT INTO template_vuln (template_id, vul_id, vul_name)
+           VALUES ($1, $2, $3)`,
+          [newTemplateId, vuln.vulnid, vuln.vulname]
         );
       }
     }
+
     await client.query('COMMIT');
-    res.json({ success: true });
+    res.status(201).send('✅ 템플릿 저장 성공');
   } catch (err) {
     await client.query('ROLLBACK');
-    console.error('❌ evaluation_results 미리 생성 실패:', err.message);
-    res.status(500).json({ error: 'DB 오류' });
+    console.error('❌ 템플릿 저장 실패:', err);
+    res.status(500).send('❌ 서버 오류');
   } finally {
     client.release();
-  }
-});
-
-// 로그인 API
-app.post('/api/login', async (req, res) => {
-  const { username, password } = req.body;
-  try {
-    // users 테이블에서 사용자 조회
-    const userRes = await pool.query(
-      'SELECT username, password_hash, role FROM users WHERE username = $1',
-      [username]
-    );
-    if (userRes.rowCount === 0) {
-      return res.status(401).json({ success: false, error: '존재하지 않는 사용자입니다.' });
-    }
-    const user = userRes.rows[0];
-
-    // 비밀번호 비교 (bcrypt)
-    const match = await bcrypt.compare(password, user.password_hash);
-    if (!match) {
-      return res.status(401).json({ success: false, error: '비밀번호가 일치하지 않습니다.' });
-    }
-
-    // 로그인 성공
-    res.json({
-      success: true,
-      username: user.username,
-      role: user.role // 'admin' 또는 'user'
-    });
-  } catch (err) {
-    console.error('❌ 로그인 오류:', err.message);
-    res.status(500).json({ success: false, error: '서버 오류' });
-  }
-});
-
-// 사용자 등록 API
-app.post('/api/register', async (req, res) => {
-  const { username, password, name, email, role } = req.body;
-  if (!username || !password || !name || !email || !role) {
-    return res.status(400).json({ success: false, error: '모든 항목을 입력하세요.' });
-  }
-  try {
-    // 중복 체크
-    const exists = await pool.query('SELECT 1 FROM users WHERE username = $1', [username]);
-    if (exists.rowCount > 0) {
-      return res.status(409).json({ success: false, error: '이미 존재하는 아이디입니다.' });
-    }
-    const hash = await bcrypt.hash(password, 10);
-    await pool.query(
-      `INSERT INTO users (username, password_hash, name, email, role, is_active, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, true, NOW(), NOW())`,
-      [username, hash, name, email, role]
-    );
-    res.json({ success: true });
-  } catch (err) {
-    console.error('❌ 사용자 등록 오류:', err.message);
-    res.status(500).json({ success: false, error: '서버 오류' });
   }
 });

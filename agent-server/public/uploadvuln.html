@@ -5,61 +5,411 @@
   <title>취약점 목록 업로드</title>
   <style>
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #f5f9ff;
+      font-family:
+        -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+        "Apple SD Gothic Neo", "Malgun Gothic", "Nanum Gothic", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+        sans-serif;
+      background: linear-gradient(120deg, #e0e7ff 0%, #f5f9ff 100%);
       margin: 0;
       padding: 0;
+      min-height: 80vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      width: 100%;
+      background: #fff;
+      box-shadow: 0 2px 12px rgba(0,32,128,0.04);
+      padding: 0;
+      margin: 0;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .nav-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+      height: 62px;
+    }
+    .nav-title a {
+      color: #2d3a5c;
+      font-size: 1.35em;
+      font-weight: 800;
+      text-decoration: none;
+      letter-spacing: -1px;
+      transition: color 0.18s;
+    }
+    .nav-title a:hover {
+      color: #4f8cff;
+    }
+    .nav-menu {
+      display: flex;
+      gap: 18px;
+    }
+    .nav-menu a {
+      color: #4f8cff;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 1em;
+      padding: 7px 16px;
+      border-radius: 6px;
+      transition: background 0.15s, color 0.15s;
+    }
+    .nav-menu a.active, .nav-menu a:hover {
+      background: #e9eef6;
+      color: #0056b3;
+    }
+    .main-layout {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 40px;
+      max-width: 1200px;
+      margin: 60px auto 40px auto;
+      padding: 0 24px;
+      flex: 1 0 auto;
     }
     .container {
-      max-width: 500px;
-      margin: 60px auto;
-      padding: 30px;
-      background-color: white;
-      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
-      border-radius: 12px;
-      text-align: center;
+      flex: 1 1 420px;
+      background: #fff;
+      box-shadow: 0 8px 32px rgba(0, 32, 128, 0.07);
+      border-radius: 18px;
+      padding: 38px 36px 32px 36px;
+      min-width: 340px;
+      max-width: 480px;
+      margin-bottom: 24px;
+      transition: box-shadow 0.2s;
     }
-    h2 {
+    .container:hover {
+      box-shadow: 0 12px 36px rgba(0, 32, 128, 0.13);
+    }
+    h2, h3 {
+      color: #2d3a5c;
+      margin-bottom: 24px;
+      font-weight: 700;
+      letter-spacing: -1px;
+    }
+    h3 {
+      font-size: 1.18em;
+      margin-bottom: 18px;
+    }
+    .csv-guide {
+      background: linear-gradient(90deg, #f0f4fa 60%, #e9eef6 100%);
+      border-radius: 10px;
+      padding: 18px 18px 14px 18px;
+      margin-bottom: 22px;
+      color: #333;
+      font-size: 15px;
+      text-align: left;
+      box-shadow: 0 2px 8px rgba(0,32,128,0.03);
+    }
+    .csv-guide pre {
+      background: #e9eef6;
+      border-radius: 6px;
+      padding: 8px;
+      margin: 8px 0 0 0;
+      font-size: 13px;
+      color: #2d3a5c;
+    }
+    .csv-guide b {
       color: #0056b3;
-      margin-bottom: 30px;
+    }
+    form {
+      margin-bottom: 0;
     }
     input[type="file"] {
-      margin: 20px 0;
+      margin: 18px 0 10px 0;
       padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #d0d7e5;
+      background: #f8fafc;
+      font-size: 15px;
+      width: 100%;
+      box-sizing: border-box;
     }
-    button {
-      padding: 12px 30px;
-      background-color: #007bff;
-      color: white;
+    .btn-main {
+      padding: 13px 0;
+      background: linear-gradient(90deg, #4f8cff 60%, #0056b3 100%);
+      color: #fff;
       border: none;
       font-size: 16px;
-      border-radius: 6px;
+      border-radius: 7px;
       cursor: pointer;
-      margin-top: 10px;
+      margin-top: 12px;
+      width: 100%;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      box-shadow: 0 2px 8px rgba(0,32,128,0.07);
+      transition: background 0.18s;
     }
-    button:hover {
-      background-color: #0056b3;
+    .btn-main:hover {
+      background: linear-gradient(90deg, #0056b3 60%, #4f8cff 100%);
     }
     .status {
-      margin-top: 20px;
-      font-weight: bold;
+      margin-top: 18px;
+      font-weight: 600;
       color: #d00;
+      font-size: 15px;
+      min-height: 22px;
+      text-align: center;
     }
     .success {
       color: #007b00;
     }
+    .divider {
+      border: none;
+      border-top: 1.5px solid #e0e5ef;
+      margin: 36px 0 28px 0;
+    }
+    .section-title {
+      font-size: 1.07em;
+      color: #0056b3;
+      margin-bottom: 10px;
+      font-weight: 600;
+      letter-spacing: -0.5px;
+    }
+    #singleVulnForm {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0;
+      margin-bottom: 0;
+    }
+    /* 폼 라벨 및 입력/셀렉트 스타일 통일 및 스타일리쉬하게 */
+    .form-row {
+      display: flex;
+      align-items: center;
+      gap: 16px; /* 모든 입력/구분란 간격을 동일하게 */
+      margin-bottom: 14px;
+    }
+    .form-label {
+      font-size: 16px;
+      font-weight: 600;
+      color: #1a2540;
+      min-width: 70px;
+      text-align: right;
+      margin-right: 0; /* gap으로만 간격 조정 */
+      letter-spacing: -0.5px;
+      background: none;
+      border: none;
+      padding: 0;
+      height: 40px;
+      display: flex;
+      align-items: center;
+    }
+    #singleVulnForm select,
+    #singleVulnForm input[type="text"],
+    #singleVulnForm input[type="number"] {
+      font-size: 16px;
+      height: 40px;
+      padding: 0 10px;
+      border-radius: 8px;
+      border: 1.5px solid #d0d7e5;
+      background: #f8fafc;
+      box-sizing: border-box;
+      transition: border 0.18s, box-shadow 0.18s;
+      outline: none;
+      margin-right: 0;
+      margin-left: 0;
+      text-align: left;
+    }
+    /* 통제영역, 대분류, 중분류도 동일한 gap 적용 */
+    .form-row.triple-group {
+      gap: 16px;
+    }
+    .form-row.triple-group > .form-label,
+    .form-row.triple-group > select {
+      margin-right: 0 !important;
+      margin-left: 0 !important;
+    }
+    .form-row.triple-group > select {
+      min-width: 90px;
+      max-width: 120px;
+    }
+    /* 반응형 */
+    @media (max-width: 900px) {
+      .main-layout {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+      }
+      .container {
+        max-width: 100%;
+        min-width: 0;
+        margin: 0 0 24px 0;
+      }
+      .form-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 4px;
+      }
+      .form-label {
+        text-align: left;
+        margin-bottom: 3px;
+        min-width: 0;
+      }
+      #singleVulnForm .id-group select,
+      #singleVulnForm .id-group input[type="text"] {
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+      }
+      .form-row.triple-group {
+        gap: 4px;
+      }
+      .form-row.triple-group > select {
+        min-width: 0;
+        max-width: 100%;
+      }
+    }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h2>취약점 목록 CSV 업로드</h2>
-    <form id="uploadForm">
-      <input type="file" id="csvfile" name="csvfile" accept=".csv" required />
-      <br>
-      <button type="submit">업로드</button>
-    </form>
-    <div id="status" class="status"></div>
+  <header>
+    <div class="nav-inner">
+      <div class="nav-title">
+        <a href="/">자산관리시스템</a>
+      </div>
+      <nav class="nav-menu">
+        <a href="/" class="active">홈</a>
+        <a href="/assetlist.html">자산 목록</a>
+        <a href="/registerasset.html">자산 등록</a>
+        <a href="/templatelist.html">템플릿 목록</a>
+        <a href="/newtemplate.html">새 템플릿 등록</a>
+        <a href="/assessform.html">자산 점검</a>
+        <a href="/uploadvuln.html" style="background:#4f8cff; color:#fff;">취약점 업로드</a>
+      </nav>
+    </div>
+  </header>
+  <div class="main-layout" style="align-items: flex-start;">
+    <!-- 왼쪽: 개별 입력 폼 -->
+    <div class="container" style="max-width:1100px; min-width:600px;">
+      <h2>취약점 목록 개별 입력</h2>
+      <div class="section-title" style="margin-bottom:8px;">개별 취약점 직접 추가</div>
+      <form id="singleVulnForm" style="margin-bottom:18px;">
+        <!-- 구분/취약점ID 한 줄에 -->
+        <div class="form-row">
+          <label class="form-label" for="category">구분</label>
+          <select id="category" required>
+            <option value="">선택하세요.</option>
+            <option value="서버">서버</option>
+            <option value="데이터베이스">데이터베이스</option>
+            <option value="네트워크장비">네트워크장비</option>
+            <option value="정보보호시스템">정보보호시스템</option>
+          </select>
+          <div class="id-group">
+            <select id="singleIdPrefix" required>
+              <option value="">선택하세요</option>
+              <option value="SRV">SRV</option>
+              <option value="DBM">DBM</option>
+              <option value="SECU">SECU</option>
+              <option value="NTW">NTW</option>
+            </select>
+            <input type="text" id="singleIdNum" placeholder="번호 (예: 001)" required maxlength="3"/>
+          </div>
+        </div>
+        <!-- 통제영역, 대분류, 중분류 한 줄에 (간격 일정하게) -->
+        <div class="form-row triple-group">
+          <label class="form-label" for="control_area">통제 영역</label>
+          <select id="control_area" required>
+            <option value="">선택하세요</option>
+            <option value="가">가</option>
+            <option value="나">나</option>
+            <option value="다">다</option>
+          </select>
+          <label class="form-label" for="control_type_large">대분류</label>
+          <select id="control_type_large" required>
+            <option value="">선택하세요</option>
+            <option value="가">가</option>
+            <option value="나">나</option>
+            <option value="다">다</option>
+          </select>
+          <label class="form-label" for="control_type_medium">중분류</label>
+          <select id="control_type_medium" required>
+            <option value="">선택하세요</option>
+            <option value="가">가</option>
+            <option value="나">나</option>
+            <option value="다">다</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="vul_name">취약점명</label>
+          <input type="text" id="vul_name" required style="flex:1;"/>
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="risk_level">위험도</label>
+          <input type="number" id="risk_level" min="1" max="5" required style="width:120px;"/>
+          <label class="form-label" for="target_system_select" style="margin-left:24px;">대상 시스템</label>
+          <select id="target_system_select" required style="flex:1;">
+            <option value="">선택하세요</option>
+            <option value="AIX">AIX</option>
+            <option value="HP-UX">HP-UX</option>
+            <option value="Linux">Linux</option>
+            <option value="Solaris">Solaris</option>
+            <option value="Windows">Windows</option>
+            <option value="WebService">WebService</option>
+            <option value="Apache">Apache</option>
+            <option value="WebtoB">WebtoB</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="details">상세설명</label>
+          <input type="text" id="details" required style="flex:1;"/>
+        </div>
+        <div class="form-row">
+          <label class="form-label">기준</label>
+          <div class="basis-checkbox-group" style="display:flex; gap:18px;">
+            <label class="form-label-checkbox" style="font-weight:400;">
+              <input type="checkbox" id="basis_financial_chk" /> 전자금융
+            </label>
+            <label class="form-label-checkbox" style="font-weight:400;">
+              <input type="checkbox" id="basis_critical_info_chk" /> 주요정보
+            </label>
+          </div>
+        </div>
+        <div style="margin-top:18px;">
+          <button type="submit" class="btn-main">개별 추가</button>
+        </div>
+      </form>
+      <div id="singleStatus" class="status"></div>
+    </div>
+    <!-- 오른쪽: CSV 업로드 패널 -->
+    <aside class="container" style="max-width:420px; min-width:320px; margin-left:40px;">
+      <h2 style="font-size:1.18em; margin-bottom:18px;">CSV 파일 업로드</h2>
+      <div class="csv-guide">
+        <b>CSV 파일 양식 안내</b>
+        <br>
+        아래와 같은 형식의 CSV 파일만 업로드할 수 있습니다.<br>
+        <span style="font-size:13px; color:#666;">예시:</span>
+        <br>
+        <pre style="white-space:pre-wrap; word-break:break-all;">
+vul_id,category,control_area,control_type_large,control_type_medium,vul_name,risk_level,details,target_system,basis,basis_financial,basis_critical_info,target_aix,target_hp_ux,target_linux,target_solaris,target_win,target_webservice,target_apache,target_webtob
+SRV-001,서버,접근통제,인증,계정관리,불필요한 기본 계정 활성화,3,기본 계정이 비활성화되지 않아 보안 위험이 존재합니다.,Linux,보안 권고사항 기준,Y,N,N,N,Y,N,Y,N
+        </pre>
+        <span style="font-size:13px; color:#666;">※ 첫 줄은 반드시 <b>vul_id,category,control_area,...</b> 등 vulnerability 테이블의 필드명이어야 하며, <b>vul_id</b>는 고유값입니다.</span>
+        <br>
+        <a 
+          href="data:text/csv;charset=utf-8,vul_id,category,control_area,control_type_large,control_type_medium,vul_name,risk_level,details,target_system,basis,basis_financial,basis_critical_info,target_aix,target_hp_ux,target_linux,target_solaris,target_win,target_webservice,target_apache,target_webtob%0ASRV-001,%EC%84%9C%EB%B2%84,%EC%A0%91%EA%B7%BC%ED%86%B5%EC%A0%9C,%EC%9D%B8%EC%A6%9D,%EA%B3%84%EC%A0%95%EA%B4%80%EB%A6%AC,%EB%B6%88%ED%95%9C%20%EA%B8%B0%EB%B3%B8%20%EA%B3%84%EC%A0%95%20%ED%99%9C%EC%84%B1%ED%99%94,3,%EA%B8%B0%EB%B3%B8%20%EA%B3%84%EC%A0%95%EC%9D%B4%20%EB%B9%84%ED%99%9C%EC%84%B1%ED%99%94%EB%90%98%EC%A7%80%20%EC%95%8A%EC%95%84%20%EB%B3%B4%EC%95%88%20%EC%9C%84%ED%97%98%EC%9D%B4%20%EC%A1%B4%EC%9E%AC%ED%95%A9%EB%8B%88%EB%8B%A4.,Linux,%EB%B3%B4%EC%95%88%20%EA%B6%8C%EA%B3%A0%EC%82%AC%ED%95%AD%20%EA%B8%B0%EC%A4%80,Y,N,N,N,Y,N,Y,N"
+          download="vulnerability_sample.csv"
+          style="display:inline-block; margin-top:10px; color:#fff; background:#4f8cff; padding:7px 18px; border-radius:6px; font-size:14px; text-decoration:none; font-weight:600; box-shadow:0 2px 8px rgba(0,32,128,0.07); transition:background 0.18s;"
+          onmouseover="this.style.background='#0056b3';"
+          onmouseout="this.style.background='#4f8cff';"
+        >예시 CSV 다운로드</a>
+      </div>
+      <form id="uploadForm" style="margin-top:18px;">
+        <input type="file" id="csvfile" name="csvfile" accept=".csv" required />
+        <button type="submit" class="btn-main">CSV 업로드</button>
+      </form>
+      <div id="status" class="status"></div>
+    </aside>
   </div>
+  <footer>
+    © 2025 보안 점검 시스템 — All rights reserved.
+  </footer>
   <script>
     document.getElementById('uploadForm').addEventListener('submit', async function(e) {
       e.preventDefault();
@@ -88,6 +438,139 @@
       } catch (err) {
         status.textContent = '❌ 네트워크 오류';
         status.className = 'status';
+      }
+    });
+
+    // 개별 취약점 추가
+    document.getElementById('singleVulnForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const prefix = document.getElementById('singleIdPrefix').value;
+      const num = document.getElementById('singleIdNum').value.trim().padStart(3, '0');
+      const vul_id = `${prefix}-${num}`;
+      const selectedSystem = document.getElementById('target_system_select').value;
+
+      // 시스템별 Y/N 자동 세팅
+      const systemFields = [
+        "AIX", "HP-UX", "Linux", "Solaris", "Windows", "WebService", "Apache", "WebtoB"
+      ];
+      const systemValues = {};
+      systemFields.forEach(sys => {
+        const key = "target_" + sys.toLowerCase().replace("-", "_");
+        systemValues[key] = (sys === selectedSystem) ? "Y" : "N";
+      });
+
+      // 기준(basis) 체크박스 처리
+      const isFinancial = document.getElementById('basis_financial_chk').checked;
+      const isCritical = document.getElementById('basis_critical_info_chk').checked;
+      let basis = '';
+      if (isFinancial && isCritical) basis = '전자금융, 주요정보';
+      else if (isFinancial) basis = '전자금융';
+      else if (isCritical) basis = '주요정보';
+
+      const payload = {
+        vul_id,
+        category: document.getElementById('category').value,
+        control_area: document.getElementById('control_area').value.trim(),
+        control_type_large: document.getElementById('control_type_large').value.trim(),
+        control_type_medium: document.getElementById('control_type_medium').value.trim(),
+        vul_name: document.getElementById('vul_name').value.trim(),
+        risk_level: Number(document.getElementById('risk_level').value),
+        details: document.getElementById('details').value.trim(),
+        target_system: selectedSystem,
+        basis,
+        basis_financial: isFinancial ? 'Y' : 'N',
+        basis_critical_info: isCritical ? 'Y' : 'N',
+        ...systemValues
+      };
+      const status = document.getElementById('singleStatus');
+      status.textContent = '';
+      try {
+        const res = await fetch('/vulnerability', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          status.textContent = '✅ 취약점이 추가되었습니다.';
+          status.className = 'status success';
+          document.getElementById('singleVulnForm').reset();
+          loadVulnList(); // 추가 후 목록 즉시 갱신
+        } else {
+          const msg = await res.text();
+          status.textContent = '❌ 추가 실패: ' + msg;
+          status.className = 'status';
+        }
+      } catch (err) {
+        status.textContent = '❌ 네트워크 오류';
+        status.className = 'status';
+      }
+    });
+
+    // 취약점 목록 불러오기 (표 형태)
+    async function loadVulnList() {
+      const listDiv = document.getElementById('vulnList');
+      try {
+        // vulnerability 테이블에서 불러오도록 API 엔드포인트 명확히
+        const res = await fetch('/vulnerability');
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        if (!data.length) {
+          listDiv.innerHTML = '<span style="color:#888;">등록된 취약점이 없습니다.</span>';
+          return;
+        }
+        listDiv.innerHTML =
+          `<table class="vuln-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>구분</th>
+                <th>평가항목</th>
+                <th>기반</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.map(v =>
+                `<tr>
+                  <td>${v.vul_id}</td>
+                  <td>${v.category}</td>
+                  <td>${v.vul_name}</td>
+                  <td>${v.basis}</td>
+                </tr>`
+              ).join('')}
+            </tbody>
+          </table>`;
+      } catch {
+        listDiv.innerHTML = '<span style="color:#d00;">목록을 불러오지 못했습니다.</span>';
+      }
+    }
+    loadVulnList();
+
+    // 업로드/개별추가 후 목록 새로고침
+    document.getElementById('uploadForm').addEventListener('submit', function() {
+      setTimeout(loadVulnList, 700);
+    });
+    document.getElementById('singleVulnForm').addEventListener('submit', function() {
+      setTimeout(loadVulnList, 700);
+    });
+
+    // category 선택 시 ID 구분 자동 선택
+    document.getElementById('category').addEventListener('change', function() {
+      const prefixSelect = document.getElementById('singleIdPrefix');
+      switch (this.value) {
+        case '서버':
+          prefixSelect.value = 'SRV';
+          break;
+        case '데이터베이스':
+          prefixSelect.value = 'DBM';
+          break;
+        case '네트워크장비':
+          prefixSelect.value = 'NTW';
+          break;
+        case '정보보호시스템':
+          prefixSelect.value = 'SECU';
+          break;
+        default:
+          prefixSelect.value = '';
       }
     });
   </script>
