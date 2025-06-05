@@ -134,8 +134,11 @@
             return;
           }
 
+          const hostname = getQueryParam("hostname");
+          const ip = getQueryParam("ip");
+
           document.getElementById("templateInfo").textContent =
-            `템플릿 이름: ${data[0].templatename} / 호스트: ${data[0].hostname} / IP: ${data[0].ip || 'N/A'}`;
+            `템플릿 이름: ${data[0].templatename} / 호스트: ${hostname || data[0].hostname} / IP: ${ip || data[0].ip || 'N/A'}`;
 
           data.forEach(row => {
             const resultClass = getStatusClass(row.result);

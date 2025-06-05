@@ -274,7 +274,7 @@ app.get('/api/template/by-id/:templateid', async (req, res) => {
          r.templateid,
          r.templatename,
          r.host_name AS hostname,
-         a.ip AS ip, -- asset 테이블에서 IP 가져오기
+         a.ip AS ip,
          t.vul_id AS vulnid,
          t.vul_name AS vulname,
          r.result,
@@ -286,6 +286,8 @@ app.get('/api/template/by-id/:templateid', async (req, res) => {
          r.last_checked_at,
          r.detail,
          r.service_status,
+         r.check_start_time,
+         r.check_end_time,
          CASE WHEN r.result = '양호' THEN r.vuln_score ELSE 0 END AS vuln_last_score
        FROM evaluation_results r
        JOIN template_vuln t 
@@ -314,7 +316,8 @@ app.post('/api/result', async (req, res) => {
            detail = $2,
            service_status = $3,
            checked_by_agent = true,
-           last_checked_at = NOW()
+           last_checked_at = NOW(),
+           check_end_time = NOW()
        WHERE host_name = $4 AND item_id = $5`,
       [result, detail, service_status, host_name, item_id]
     );
@@ -349,7 +352,11 @@ app.post('/api/send-command', async (req, res) => {
 
     await pool.query(
       `UPDATE evaluation_results
-       SET result = '점검 중', last_checked_at = NOW(), checked_by_agent = false
+       SET result = '점검 중', 
+           last_checked_at = NOW(), 
+           checked_by_agent = false,
+           check_start_time = NOW(),
+           check_end_time = NULL
        WHERE id = $1`, [id]
     );
 
@@ -641,6 +648,7 @@ app.patch('/api/asset/:id', async (req, res) => {
   }
 });
 
+/*
 // 점검 시작 시 evaluation_results 미리 생성 API
 app.post('/api/evaluation/init', async (req, res) => {
   const { assetId, templateId } = req.body;
@@ -711,6 +719,65 @@ app.post('/api/evaluation/init', async (req, res) => {
     client.release();
   }
 });
+*/
+app.post('/api/evaluation/init', async (req, res) => {
+  const { assetId, templateId, evaluationName } = req.body;
+
+  if (!assetId || !templateId || !evaluationName) {
+    return res.status(400).json({ error: '필수 값이 누락되었습니다.' });
+  }
+
+  try {
+    // 1. 자산 정보 가져오기
+    const assetRes = await pool.query('SELECT * FROM asset WHERE id = $1', [assetId]);
+    if (assetRes.rows.length === 0) {
+      return res.status(404).json({ error: '자산을 찾을 수 없습니다.' });
+    }
+    const asset = assetRes.rows[0];
+
+    // 2. 템플릿 정보 가져오기
+    const templateRes = await pool.query('SELECT * FROM template WHERE template_id = $1', [templateId]);
+    if (templateRes.rows.length === 0) {
+      return res.status(404).json({ error: '템플릿을 찾을 수 없습니다.' });
+    }
+    const template = templateRes.rows[0];
+
+    // 3. 템플릿 항목들 가져오기
+    const itemsRes = await pool.query('SELECT * FROM template_vuln WHERE template_id = $1', [templateId]);
+    const items = itemsRes.rows;
+
+    if (items.length === 0) {
+      return res.status(400).json({ error: '템플릿에 점검 항목이 없습니다.' });
+    }
+
+    // 4. evaluation_results에 각 항목 INSERT
+    for (const item of items) {
+      const insertQuery = `
+        INSERT INTO evaluation_results (
+          templateid, templatename, host_name, item_id, item_name, result,
+          checked_by_agent, evaluation_name, risk_grade
+        )
+        VALUES ($1, $2, $3, $4, $5, '미점검', false, $6, 3)
+        ON CONFLICT (templateid, host_name, item_id) DO NOTHING
+      `;
+      await pool.query(insertQuery, [
+        templateId,
+        template.template_name,
+        asset.hostname,
+        item.vuln_id,
+        item.vuln_name,
+        evaluationName
+      ]);
+    }
+
+    res.status(200).json({ message: '점검 항목이 성공적으로 생성되었습니다.' });
+  } catch (err) {
+    console.error('점검 항목 생성 오류:', err);
+    res.status(500).json({ error: '서버 오류 발생' });
+  }
+});
+
+
 
 // 로그인 API
 app.post('/api/login', async (req, res) => {
@@ -766,5 +833,32 @@ app.post('/api/register', async (req, res) => {
   } catch (err) {
     console.error('❌ 사용자 등록 오류:', err.message);
     res.status(500).json({ success: false, error: '서버 오류' });
+  }
+});
+
+// 전체 점검 리스트 조회
+app.get('/api/evaluations', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT 
+         er.id,
+         er.templateid,
+         er.templatename,
+         er.host_name,
+         er.item_id,
+         er.item_name,
+         er.result,
+         er.risk_grade,
+         er.checked_by_agent,
+         er.last_checked_at,
+         er.detail,
+         er.service_status
+       FROM evaluation_results er
+       ORDER BY er.templateid, er.host_name, er.item_id`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('❌ 점검 리스트 조회 실패:', err.message);
+    res.status(500).send('DB 조회 실패');
   }
 });

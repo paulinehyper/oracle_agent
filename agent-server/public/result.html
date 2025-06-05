@@ -93,16 +93,18 @@
   <p id="templateInfo">템플릿 정보를 불러오는 중...</p>
   <button onclick="runAllChecks()" style="margin-top: 10px;">🔁 전체 점검</button>
 
-  <table id="resultTable" style="display: none;">
+  <table class="table table-striped table-hover" id="resultTable">
     <thead>
       <tr>
-        <th>Vuln ID</th>
-        <th>Vuln Name</th>
+        <th>항목 ID</th>
+        <th>항목명</th>
         <th>위험도</th>
-        <th>Result</th>
-        <th>상세설명</th>
+        <th>상태</th>
+        <th>정보</th>
         <th>서비스</th>
-        <th>Action</th>
+        <th>점검 시작</th>
+        <th>점검 종료</th>
+        <th>작업</th>
       </tr>
     </thead>
     <tbody></tbody>
@@ -147,6 +149,8 @@
               <td class="status ${resultClass}" id="status-${row.id}">${row.result}</td>
               <td>${row.vul_info ? row.vul_info.replace(/</g, '&lt;').replace(/>/g, '&gt;') : ''}</td>
               <td id="service-${row.id}">${row.service_status || 'N/A'}</td>
+              <td id="start-${row.id}">${row.check_start_time ? new Date(row.check_start_time).toLocaleString() : '-'}</td>
+              <td id="end-${row.id}">${row.check_end_time ? new Date(row.check_end_time).toLocaleString() : '-'}</td>
               <td id="action-${row.id}">
                 <button onclick="runCheck(${row.id}, '${row.vulnid}', '${row.hostname}')">점검</button>
                 ${row.detail ? `<button onclick="showDetail(\`${row.detail.replace(/`/g, '\\`')}\`)">상세</button>` : ''}
