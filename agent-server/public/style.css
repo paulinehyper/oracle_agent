@@ -111,3 +111,10 @@ th {
 .btn-delete:hover {
   background-color: #b71c1c;
 }
+
+#vulnerability-panel {
+  max-height: 600px; /* 필요시 조절 */
+  overflow-y: auto;
+  border: 1px solid #ccc; /* 보기 편하게 경계선 */
+  padding: 10px;
+}

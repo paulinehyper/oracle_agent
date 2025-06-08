@@ -26,7 +26,9 @@
     .vuln-section {
       flex: 1.2;
       max-height: 700px;
+      height: 700px;
       overflow-y: auto;
+      overflow-x: hidden;
       border-left: 1px solid #ddd;
       padding-left: 20px;
     }
@@ -67,10 +69,13 @@
     .sub-targets-box label {
       font-weight: normal;
     }
-    table {
+    .table-scroll {
+      overflow-y: visible;
+      max-height: none;
+    }
+    .table-scroll table {
       width: 100%;
       border-collapse: collapse;
-      text-align: center;
     }
     th, td {
       padding: 10px;
@@ -161,19 +166,21 @@
       <div class="status" id="status"></div>
     </form>
     <div class="vuln-section">
-      <table>
-        <thead>
-          <tr>
-            <th>✔</th>
-            <th>ID</th>
-            <th>이름</th>
-            <th>위험도</th>
-            <th>대상</th>
-            <th>기반</th>
-          </tr>
-        </thead>
-        <tbody id="vulnTableBody"></tbody>
-      </table>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>✔</th>
+              <th>ID</th>
+              <th>이름</th>
+              <th>위험도</th>
+              <th>대상</th>
+              <th>기반</th>
+            </tr>
+          </thead>
+          <tbody id="vulnTableBody"></tbody>
+        </table>
+      </div>
     </div>
   </div>
   <div id="successModal" class="modal">

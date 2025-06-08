@@ -78,15 +78,13 @@ app.post('/api/template', async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    // template_id는 SERIAL로 자동 생성됨
-    const result = await client.query(
-      `INSERT INTO template (template_name, target_type, basis_type)
-       VALUES ($1, $2, $3)
-       RETURNING template_id`,
-      [template_name, target_type, basis_type]
+    // template_id를 문자열로 생성
+    const newTemplateId = `tmpl_${Date.now()}`;
+    await client.query(
+      `INSERT INTO template (template_id, template_name, target_type, basis_type)
+       VALUES ($1, $2, $3, $4)`,
+      [newTemplateId, template_name, target_type, basis_type]
     );
-
-    const newTemplateId = result.rows[0].template_id;
 
     for (const vuln of vulns) {
       await client.query(
@@ -764,8 +762,8 @@ app.post('/api/evaluation/init', async (req, res) => {
         templateId,
         template.template_name,
         asset.hostname,
-        item.vuln_id,
-        item.vuln_name,
+        item.vul_id,    // ← 여기!
+        item.vul_name,  // ← 여기!
         evaluationName
       ]);
     }
