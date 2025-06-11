@@ -74,7 +74,6 @@
   <div class="container">
     <h2>자산 점검 시작</h2>
     <form id="assessForm">
-      <!-- ✅ 점검 이름 입력란 추가 -->
       <label for="evaluationName">점검 이름</label>
       <input type="text" id="evaluationName" name="evaluationName" placeholder="예: 2025년 6월 정기점검" required>
 
@@ -103,118 +102,129 @@
   </div>
 
   <script>
-  let assetMap = {};
+    let assetMap = {};
 
-  async function loadAssets() {
-    const res = await fetch('/api/asset/list');
-    const assets = await res.json();
-    const select = document.getElementById('assetSelect');
-    assets.forEach(a => {
-      assetMap[a.id] = a;
-      const option = document.createElement('option');
-      option.value = a.id;
-      option.textContent = `${a.name} (${a.hostname}, ${a.ip})`;
-      select.appendChild(option);
-    });
-  }
+    async function loadAssets() {
+      const res = await fetch('/api/asset/list');
+      const assets = await res.json();
+      const select = document.getElementById('assetSelect');
+      assets.forEach(a => {
+        assetMap[a.id] = a;
+        const option = document.createElement('option');
+        option.value = a.id;
+        option.textContent = `${a.name} (${a.hostname}, ${a.ip})`;
+        select.appendChild(option);
+      });
+    }
 
-  async function loadTemplates() {
-    const res = await fetch('/api/template/list');
-    const templates = await res.json();
-    const select = document.getElementById('templateSelect');
-    templates.forEach(t => {
-      const option = document.createElement('option');
-      option.value = t.template_id;
-      option.textContent = `${t.template_name} [${t.target_type}]`;
-      select.appendChild(option);
-    });
-  }
+    async function loadTemplates() {
+      const res = await fetch('/api/template/list');
+      const templates = await res.json();
+      const select = document.getElementById('templateSelect');
+      templates.forEach(t => {
+        const option = document.createElement('option');
+        option.value = t.template_id;
+        option.textContent = `${t.template_name} [${t.target_type}]`;
+        select.appendChild(option);
+      });
+    }
 
-  document.addEventListener('DOMContentLoaded', () => {
-    loadAssets();
-    loadTemplates();
+    document.addEventListener('DOMContentLoaded', () => {
+      loadAssets();
+      loadTemplates();
 
-    document.getElementById('templateSelect').addEventListener('change', async function () {
-      const templateId = this.value;
-      const assetId = document.getElementById('assetSelect').value;
+      document.getElementById('templateSelect').addEventListener('change', async function () {
+        const templateId = this.value;
+        const assetId = document.getElementById('assetSelect').value;
 
-      if (assetId && assetMap[assetId]) {
-        const a = assetMap[assetId];
-        document.getElementById('selectedAsset').innerHTML = `
-          <strong>${a.name}</strong><br>
-          호스트네임: ${a.hostname}<br>
-          IP: ${a.ip}<br>
-          관리자: ${a.manager || '-'}
-        `;
-      }
-
-      if (!templateId) return;
-
-      try {
-        const res = await fetch(`/api/template/${templateId}/items`);
-        const items = await res.json();
-        const itemsArea = document.getElementById('templateItems');
-        if (items.length === 0) {
-          itemsArea.innerHTML = '<div class="empty">점검 항목이 없습니다.</div>';
-          return;
+        if (assetId && assetMap[assetId]) {
+          const a = assetMap[assetId];
+          document.getElementById('selectedAsset').innerHTML = `
+            <strong>${a.name}</strong><br>
+            호스트네임: ${a.hostname}<br>
+            IP: ${a.ip}<br>
+            관리자: ${a.manager || '-'}
+          `;
         }
-        itemsArea.innerHTML = `
-          <table>
-            <thead>
-              <tr>
-                <th>항목명</th>
-                <th>설명</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${items.map(i => `
+
+        if (!templateId) return;
+
+        try {
+          const res = await fetch(`/api/template/${templateId}/items`);
+          const items = await res.json();
+          const itemsArea = document.getElementById('templateItems');
+          if (items.length === 0) {
+            itemsArea.innerHTML = '<div class="empty">점검 항목이 없습니다.</div>';
+            return;
+          }
+          itemsArea.innerHTML = `
+            <table>
+              <thead>
                 <tr>
-                  <td>${i.item_name || '-'}</td>
-                  <td>${i.description || '-'}</td>
+                  <th>항목명</th>
+                  <th>설명</th>
                 </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        `;
-      } catch (err) {
-        document.getElementById('templateItems').innerHTML = '<div class="empty">점검 항목을 불러오지 못했습니다.</div>';
-        console.error('템플릿 항목 로딩 실패:', err);
-      }
-    });
+              </thead>
+              <tbody>
+                ${items.map(i => `
+                  <tr>
+                    <td>${i.item_name || '-'}</td>
+                    <td>${i.description || '-'}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          `;
+        } catch (err) {
+          document.getElementById('templateItems').innerHTML = '<div class="empty">점검 항목을 불러오지 못했습니다.</div>';
+          console.error('템플릿 항목 로딩 실패:', err);
+        }
+      });
 
-    document.getElementById('assessForm').addEventListener('submit', async function (e) {
-      e.preventDefault();
-      const assetId = document.getElementById('assetSelect').value;
-      const templateId = document.getElementById('templateSelect').value;
-      const evaluationName = document.getElementById('evaluationName').value;
+      document.getElementById('assessForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const assetId = document.getElementById('assetSelect').value;
+        const templateId = document.getElementById('templateSelect').value;
+        const evaluationName = document.getElementById('evaluationName').value;
 
-      if (!assetId || !templateId || !evaluationName.trim()) {
-        document.getElementById('status').textContent = '점검 이름, 자산, 템플릿을 모두 입력하세요.';
-        return;
-      }
-
-      try {
-        const res = await fetch('/api/evaluation/init', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ assetId, templateId, evaluationName })
-        });
-        if (!res.ok) {
-          document.getElementById('status').textContent = '점검 결과 생성에 실패했습니다.';
+        if (!assetId || !templateId || !evaluationName.trim()) {
+          document.getElementById('status').textContent = '점검 이름, 자산, 템플릿을 모두 입력하세요.';
           return;
         }
-      } catch (err) {
-        document.getElementById('status').textContent = '점검 결과 생성 중 오류가 발생했습니다.';
-        return;
-      }
 
-      const asset = assetMap[assetId];
-      const ip = encodeURIComponent(asset.ip);
-      const hostname = encodeURIComponent(asset.hostname);
+        try {
+          // 평가 초기화 API 호출
+          const initRes = await fetch('/api/evaluation/init', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              assetId, 
+              templateId, 
+              evaluationName 
+            })
+          });
 
-      window.location.href = `/check.html?templateid=${templateId}&assetid=${assetId}&hostname=${hostname}&ip=${ip}`;
+          if (!initRes.ok) {
+            throw new Error('평가 초기화 실패');
+          }
+
+          const asset = assetMap[assetId];
+          // assessAction.html로 이동하면서 필요한 모든 파라미터 전달
+          const params = new URLSearchParams({
+            assetid: assetId,
+            templateid: templateId,
+            evaluationName: evaluationName,
+            hostname: asset.hostname,
+            ip: asset.ip
+          });
+
+          window.location.href = `/assessAction.html?${params.toString()}`;
+        } catch (err) {
+          document.getElementById('status').textContent = '점검 초기화 중 오류가 발생했습니다.';
+          console.error('점검 초기화 실패:', err);
+        }
+      });
     });
-  });
   </script>
 </body>
 </html>

@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>템플릿 상세 정보</title>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f9ff; }
+    .container { max-width: 800px; margin: 40px auto; background: #fff; border-radius: 12px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); padding: 30px; }
+    h1 { color: #0056b3; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #e0e0e0; padding: 10px; }
+    th { background: #eaf3ff; }
+    .btn-check { margin-top: 30px; padding: 12px 30px; background: #007bff; color: #fff; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; }
+    .btn-check:disabled { background: #b2bec3; cursor: not-allowed; }
+    #status { margin-top: 20px; color: #d00; font-weight: bold; }
+    #assetSelect { margin-top: 20px; padding: 10px; font-size: 15px; border-radius: 6px; border: 1px solid #ccc; }
+    .check-btn {
+      padding: 6px 12px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .check-btn:hover {
+      background-color: #0056b3;
+    }
+    .check-btn:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+    .result-badge {
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: bold;
+    }
+    .result-badge.good {
+      background-color: #28a745;
+      color: white;
+    }
+    .result-badge.vulnerable {
+      background-color: #dc3545;
+      color: white;
+    }
+    .result-badge.checking {
+      background-color: #ffc107;
+      color: black;
+    }
+    .result-badge.unchecked {
+      background-color: #6c757d;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 id="templateName">템플릿 상세 정보</h1>
+    <div id="templateInfo"></div>
+    <button onclick="startCheck()" class="check-btn">점검 시작</button>
+    <h2>포함된 취약점 항목</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>취약점 ID</th>
+          <th>취약점명</th>
+          <th>위험도</th>
+          <th>설명</th>
+          <th>점검</th>
+          <th>결과</th>
+          <th>상세</th>
+        </tr>
+      </thead>
+      <tbody id="vulnTableBody"></tbody>
+    </table>
+    <label for="assetSelect"><strong>점검할 자산 선택:</strong></label>
+    <select id="assetSelect" required>
+      <option value="">-- 자산을 선택하세요 --</option>
+    </select>
+    <div id="status"></div>
+  </div>
+  <script>
+    let templateId = null;
+    let templateName = '';
+    async function loadTemplateDetail() {
+      const params = new URLSearchParams(window.location.search);
+      templateId = params.get('templateid');
+      if (!templateId) {
+        document.getElementById('templateInfo').textContent = '템플릿 ID가 없습니다.';
+        return;
+      }
+      // 템플릿 기본 정보 + 자산 정보
+      const res = await fetch(`/api/template/${templateId}/detail`);
+      const data = await res.json();
+      templateName = data.template.template_name;
+      document.getElementById('templateName').textContent = data.template.template_name;
+      document.getElementById('templateInfo').innerHTML = `
+        <p><strong>대상:</strong> ${data.template.target_type}</p>
+        <p><strong>기반:</strong> ${data.template.basis_type}</p>
+        <p><strong>설명:</strong> ${data.template.description || '-'}</p>
+        ${data.asset ? `
+          <p><strong>자산명:</strong> ${data.asset.name}</p>
+          <p><strong>호스트명:</strong> ${data.asset.hostname}</p>
+          <p><strong>IP:</strong> ${data.asset.ip}</p>
+        ` : ''}
+      `;
+      // 취약점 항목
+      await loadVulnItems();
+    }
+    async function loadAssets() {
+      const res = await fetch('/api/asset/list');
+      const assets = await res.json();
+      const select = document.getElementById('assetSelect');
+      assets.forEach(a => {
+        const option = document.createElement('option');
+        option.value = a.id;
+        option.textContent = `${a.name} (${a.hostname}, ${a.ip})`;
+        select.appendChild(option);
+      });
+    }
+    async function loadVulnItems() {
+      try {
+        // 취약점 목록 가져오기
+        const itemsRes = await fetch(`/api/template/${templateId}/items`);
+        const items = await itemsRes.json();
+        
+        // 점검 결과 가져오기
+        const resultsRes = await fetch(`/api/template/by-id/${templateId}`);
+        const results = await resultsRes.json();
+        
+        // 결과를 vul_id를 키로 하는 맵으로 변환
+        const resultMap = {};
+        results.forEach(r => {
+          resultMap[r.vulnid] = r;
+        });
+        
+        const tbody = document.getElementById('vulnTableBody');
+        tbody.innerHTML = '';
+        
+        items.forEach(item => {
+          const result = resultMap[item.vul_id] || {};
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${item.vul_id}</td>
+            <td>${item.item_name}</td>
+            <td>${item.risk_level || '-'}</td>
+            <td>${item.description || '-'}</td>
+            <td>
+              <button onclick="startCheck('${item.vul_id}')" class="check-btn" 
+                      ${result.result === '점검 중' ? 'disabled' : ''}>
+                ${result.result === '점검 중' ? '점검 중...' : '점검 시작'}
+              </button>
+            </td>
+            <td>
+              <span class="result-badge ${getResultClass(result.result)}">
+                ${result.result || '미점검'}
+              </span>
+            </td>
+            <td>${result.detail || '-'}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (err) {
+        console.error('취약점 목록 로드 실패:', err);
+        alert('❌ 취약점 목록을 불러오는데 실패했습니다.');
+      }
+    }
+    function getResultClass(result) {
+      switch(result) {
+        case '양호':
+          return 'good';
+        case '취약':
+          return 'vulnerable';
+        case '점검 중':
+          return 'checking';
+        default:
+          return 'unchecked';
+      }
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+      loadTemplateDetail();
+      loadAssets();
+    });
+    async function startCheck(vul_id) {
+      try {
+        // 먼저 evaluation_results 초기화
+        const initRes = await fetch('/api/evaluation/init', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            template_id: templateId,
+            vul_id: vul_id,
+            evaluation_name: '자동 점검'
+          })
+        });
+
+        if (!initRes.ok) {
+          throw new Error('점검 항목 초기화 실패');
+        }
+
+        // 점검 시작
+        const res = await fetch('/api/check/start', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            template_id: templateId,
+            vul_id: vul_id
+          })
+        });
+
+        if (!res.ok) {
+          throw new Error('점검 시작 실패');
+        }
+
+        const result = await res.json();
+        alert('✅ 점검이 시작되었습니다.');
+        
+        // 점검 상태 업데이트를 위해 목록 새로고침
+        loadVulnItems();
+        
+        // 점검 결과를 주기적으로 확인
+        startPollingResults(vul_id);
+      } catch (err) {
+        console.error('점검 시작 실패:', err);
+        alert('❌ 점검 시작에 실패했습니다.');
+      }
+    }
+    let pollingInterval = null;
+    function startPollingResults(vul_id) {
+      // 이전 폴링 중지
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
+      
+      // 3초마다 결과 확인
+      pollingInterval = setInterval(async () => {
+        try {
+          const res = await fetch(`/api/template/by-id/${templateId}`);
+          const results = await res.json();
+          const result = results.find(r => r.vulnid === vul_id);
+          
+          if (result && result.result !== '점검 중') {
+            // 점검이 완료되면 폴링 중지
+            clearInterval(pollingInterval);
+            loadVulnItems(); // 목록 새로고침
+          }
+        } catch (err) {
+          console.error('결과 확인 실패:', err);
+        }
+      }, 3000);
+    }
+  </script>
+</body>
+</html> 

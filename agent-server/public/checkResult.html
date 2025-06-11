@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>점검 결과</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .template-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        .status-select {
+            padding: 6px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        .status-good {
+            color: #28a745;
+        }
+        .status-bad {
+            color: #dc3545;
+        }
+        .status-unknown {
+            color: #6c757d;
+        }
+        .save-btn {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        .save-btn:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>점검 결과</h1>
+        <div class="template-info" id="templateInfo">
+            템플릿 정보를 불러오는 중...
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>취약점 ID</th>
+                    <th>취약점명</th>
+                    <th>위험도</th>
+                    <th>점검 결과</th>
+                    <th>상세 내용</th>
+                </tr>
+            </thead>
+            <tbody id="resultTableBody"></tbody>
+        </table>
+        <button class="save-btn" onclick="saveResults()">결과 저장</button>
+    </div>
+
+    <script>
+        let templateId = new URLSearchParams(window.location.search).get('templateid');
+        let checkResults = [];
+
+        async function loadTemplateDetails() {
+            try {
+                const res = await fetch(`/api/template/${templateId}/detail`);
+                const data = await res.json();
+                
+                document.getElementById('templateInfo').innerHTML = `
+                    <strong>템플릿명:</strong> ${data.template.template_name}<br>
+                    <strong>대상:</strong> ${data.template.target_type}<br>
+                    <strong>기반:</strong> ${data.template.basis_type}<br>
+                    ${data.asset ? `
+                        <strong>자산명:</strong> ${data.asset.name}<br>
+                        <strong>호스트명:</strong> ${data.asset.hostname}<br>
+                        <strong>IP:</strong> ${data.asset.ip}
+                    ` : ''}
+                `;
+
+                // 취약점 항목 로드
+                const itemsRes = await fetch(`/api/template/${templateId}/items`);
+                const items = await itemsRes.json();
+                
+                const tbody = document.getElementById('resultTableBody');
+                tbody.innerHTML = '';
+                
+                items.forEach(item => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${item.vul_id}</td>
+                        <td>${item.item_name}</td>
+                        <td>${item.risk_level || '-'}</td>
+                        <td>
+                            <select class="status-select" onchange="updateResult('${item.vul_id}', this.value)">
+                                <option value="미점검">미점검</option>
+                                <option value="양호">양호</option>
+                                <option value="취약">취약</option>
+                            </select>
+                        </td>
+                        <td>
+                            <textarea rows="2" style="width: 100%;" 
+                                onchange="updateDetail('${item.vul_id}', this.value)"></textarea>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (err) {
+                console.error('템플릿 정보 로드 실패:', err);
+                document.getElementById('templateInfo').textContent = '❌ 템플릿 정보를 불러오는데 실패했습니다.';
+            }
+        }
+
+        function updateResult(vulId, status) {
+            const result = checkResults.find(r => r.vul_id === vulId);
+            if (result) {
+                result.status = status;
+            } else {
+                checkResults.push({ vul_id: vulId, status: status, detail: '' });
+            }
+        }
+
+        function updateDetail(vulId, detail) {
+            const result = checkResults.find(r => r.vul_id === vulId);
+            if (result) {
+                result.detail = detail;
+            } else {
+                checkResults.push({ vul_id: vulId, status: '미점검', detail: detail });
+            }
+        }
+
+        async function saveResults() {
+            try {
+                const res = await fetch('/api/check/results', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        template_id: templateId,
+                        results: checkResults
+                    })
+                });
+
+                if (res.ok) {
+                    alert('✅ 점검 결과가 저장되었습니다.');
+                    window.location.href = '/templatelist.html';
+                } else {
+                    alert('❌ 결과 저장에 실패했습니다.');
+                }
+            } catch (err) {
+                console.error('결과 저장 실패:', err);
+                alert('❌ 결과 저장 중 오류가 발생했습니다.');
+            }
+        }
+
+        // 페이지 로드 시 템플릿 정보 로드
+        document.addEventListener('DOMContentLoaded', loadTemplateDetails);
+    </script>
+</body>
+</html> 

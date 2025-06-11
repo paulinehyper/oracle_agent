@@ -8,7 +8,6 @@ const fs = require('fs');
 const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 const upload = multer({ dest: 'uploads/' });
-
 // 여기에 추가!
 let latestCommand = null;
 // PostgreSQL 연결 설정
@@ -19,6 +18,9 @@ const pool = new Pool({
   password: '7637op2337!',
   port: 5432,
 });
+
+// agent.go 서버 URL 설정
+const AGENT_SERVER_URL = 'http://localhost:3000';
 
 app.use(cors());
 app.use(express.json());
@@ -72,7 +74,7 @@ app.post('/api/template', async (req, res) => {
 // POST /api/template
 // 템플릿 저장 (자동 생성된 template_id 사용)
 app.post('/api/template', async (req, res) => {
-  const { template_name, target_type, basis_type, vulns } = req.body;
+  const { template_name, target_type, basis_type, vulns, asset_id } = req.body;
   const client = await pool.connect();
 
   try {
@@ -81,11 +83,12 @@ app.post('/api/template', async (req, res) => {
     // template_id를 문자열로 생성
     const newTemplateId = `tmpl_${Date.now()}`;
     await client.query(
-      `INSERT INTO template (template_id, template_name, target_type, basis_type)
-       VALUES ($1, $2, $3, $4)`,
-      [newTemplateId, template_name, target_type, basis_type]
+      `INSERT INTO template (template_id, template_name, target_type, basis_type, asset_id, vuln_id)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [newTemplateId, template_name, target_type, basis_type, asset_id, vulns.map(v => v.vulnid).join(',')]
     );
 
+    // 선택된 취약점들을 template_vuln 테이블에 저장
     for (const vuln of vulns) {
       await client.query(
         `INSERT INTO template_vuln (template_id, vul_id, vul_name)
@@ -618,7 +621,11 @@ app.get('/api/template/:id/items', async (req, res) => {
   const templateId = req.params.id;
   try {
     const result = await pool.query(
-      'SELECT vul_id, vul_name AS item_name FROM template_vuln WHERE template_id = $1 ORDER BY template_id',
+      `SELECT tv.vul_id, tv.vul_name AS item_name, v.risk_level, v.details AS description
+       FROM template_vuln tv
+       LEFT JOIN vulnerability v ON tv.vul_id = v.vul_id
+       WHERE tv.template_id = $1
+       ORDER BY tv.template_id`,
       [templateId]
     );
     res.json(result.rows);
@@ -719,56 +726,59 @@ app.post('/api/evaluation/init', async (req, res) => {
 });
 */
 app.post('/api/evaluation/init', async (req, res) => {
-  const { assetId, templateId, evaluationName } = req.body;
+  const { template_id, vul_id, evaluation_name } = req.body;
 
-  if (!assetId || !templateId || !evaluationName) {
+  if (!template_id || !vul_id || !evaluation_name) {
     return res.status(400).json({ error: '필수 값이 누락되었습니다.' });
   }
 
   try {
-    // 1. 자산 정보 가져오기
-    const assetRes = await pool.query('SELECT * FROM asset WHERE id = $1', [assetId]);
-    if (assetRes.rows.length === 0) {
-      return res.status(404).json({ error: '자산을 찾을 수 없습니다.' });
-    }
-    const asset = assetRes.rows[0];
-
-    // 2. 템플릿 정보 가져오기
-    const templateRes = await pool.query('SELECT * FROM template WHERE template_id = $1', [templateId]);
+    // 1. 템플릿 정보 가져오기
+    const templateRes = await pool.query('SELECT * FROM template WHERE template_id = $1', [template_id]);
     if (templateRes.rows.length === 0) {
       return res.status(404).json({ error: '템플릿을 찾을 수 없습니다.' });
     }
     const template = templateRes.rows[0];
 
-    // 3. 템플릿 항목들 가져오기
-    const itemsRes = await pool.query('SELECT * FROM template_vuln WHERE template_id = $1', [templateId]);
-    const items = itemsRes.rows;
-
-    if (items.length === 0) {
-      return res.status(400).json({ error: '템플릿에 점검 항목이 없습니다.' });
+    // 2. 자산 정보 가져오기
+    const assetRes = await pool.query('SELECT * FROM asset WHERE id = $1', [template.asset_id]);
+    if (assetRes.rows.length === 0) {
+      return res.status(404).json({ error: '자산을 찾을 수 없습니다.' });
     }
+    const asset = assetRes.rows[0];
 
-    // 4. evaluation_results에 각 항목 INSERT
-    for (const item of items) {
-      const insertQuery = `
-        INSERT INTO evaluation_results (
-          templateid, templatename, host_name, item_id, item_name, result,
-          checked_by_agent, evaluation_name, risk_grade
-        )
-        VALUES ($1, $2, $3, $4, $5, '미점검', false, $6, 3)
-        ON CONFLICT (templateid, host_name, item_id) DO NOTHING
-      `;
-      await pool.query(insertQuery, [
-        templateId,
-        template.template_name,
-        asset.hostname,
-        item.vul_id,    // ← 여기!
-        item.vul_name,  // ← 여기!
-        evaluationName
-      ]);
+    // 3. 취약점 정보 가져오기
+    const vulnRes = await pool.query('SELECT * FROM template_vuln WHERE template_id = $1 AND vul_id = $2', 
+      [template_id, vul_id]);
+    if (vulnRes.rows.length === 0) {
+      return res.status(404).json({ error: '취약점 항목을 찾을 수 없습니다.' });
     }
+    const vuln = vulnRes.rows[0];
 
-    res.status(200).json({ message: '점검 항목이 성공적으로 생성되었습니다.' });
+    // 4. evaluation_results에 항목 INSERT
+    const insertQuery = `
+      INSERT INTO evaluation_results (
+        templateid, templatename, host_name, item_id, item_name, result,
+        checked_by_agent, evaluation_name, risk_grade
+      )
+      VALUES ($1, $2, $3, $4, $5, '미점검', false, $6, 3)
+      ON CONFLICT (templateid, host_name, item_id) DO NOTHING
+      RETURNING id
+    `;
+    
+    const result = await pool.query(insertQuery, [
+      template_id,
+      template.template_name,
+      asset.host_name,
+      vul_id,
+      vuln.vul_name,
+      evaluation_name
+    ]);
+
+    res.status(200).json({ 
+      message: '점검 항목이 성공적으로 생성되었습니다.',
+      id: result.rows[0]?.id
+    });
   } catch (err) {
     console.error('점검 항목 생성 오류:', err);
     res.status(500).json({ error: '서버 오류 발생' });
@@ -858,5 +868,137 @@ app.get('/api/evaluations', async (req, res) => {
   } catch (err) {
     console.error('❌ 점검 리스트 조회 실패:', err.message);
     res.status(500).send('DB 조회 실패');
+  }
+});
+
+// 템플릿 상세 정보 + 자산 정보
+app.get('/api/template/:templateid/detail', async (req, res) => {
+  const { templateid } = req.params;
+  try {
+    // 템플릿 정보
+    const tmplRes = await pool.query(
+      'SELECT * FROM template WHERE template_id = $1',
+      [templateid]
+    );
+    if (tmplRes.rows.length === 0) return res.status(404).json({ error: '템플릿 없음' });
+    const template = tmplRes.rows[0];
+
+    // 자산 정보
+    let asset = null;
+    if (template.asset_id) {
+      const assetRes = await pool.query('SELECT * FROM asset WHERE id = $1', [template.asset_id]);
+      asset = assetRes.rows[0] || null;
+    }
+
+    res.json({ template, asset });
+  } catch (err) {
+    res.status(500).json({ error: 'DB 오류' });
+  }
+});
+
+// 점검 시작 API
+app.post('/api/check/start', async (req, res) => {
+  const { template_id, vul_id } = req.body;
+  try {
+    console.log('📝 점검 요청:', { template_id, vul_id });
+    
+    // 템플릿 정보 가져오기
+    const templateRes = await pool.query(
+      'SELECT * FROM template WHERE template_id = $1',
+      [template_id]
+    );
+    
+    if (templateRes.rows.length === 0) {
+      throw new Error('템플릿을 찾을 수 없습니다.');
+    }
+    
+    const template = templateRes.rows[0];
+    
+    // 자산 정보 가져오기
+    const assetRes = await pool.query(
+      'SELECT * FROM asset WHERE id = $1',
+      [template.asset_id]
+    );
+    
+    if (assetRes.rows.length === 0) {
+      throw new Error('자산을 찾을 수 없습니다.');
+    }
+    
+    const asset = assetRes.rows[0];
+    
+    // evaluation_results에서 해당 항목 찾기
+    const evalRes = await pool.query(
+      `SELECT id FROM evaluation_results 
+       WHERE templateid = $1 AND item_id = $2`,
+      [template_id, vul_id]
+    );
+    
+    if (evalRes.rows.length === 0) {
+      throw new Error('점검 항목을 찾을 수 없습니다.');
+    }
+    
+    const evalId = evalRes.rows[0].id;
+    
+    // 명령 저장
+    latestCommand = {
+      id: evalId,
+      vulnid: vul_id,
+      hostname: asset.host_name
+    };
+    
+    // 점검 상태 업데이트
+    await pool.query(
+      `UPDATE evaluation_results 
+       SET result = '점검 중', 
+           last_checked_at = NOW(), 
+           checked_by_agent = false,
+           check_start_time = NOW(),
+           check_end_time = NULL
+       WHERE id = $1`,
+      [evalId]
+    );
+    
+    res.json({ 
+      success: true,
+      message: '점검이 시작되었습니다.',
+      command: latestCommand
+    });
+  } catch (err) {
+    console.error('❌ 점검 시작 실패:', err);
+    res.status(500).json({ 
+      error: '점검 처리 실패',
+      message: err.message || '알 수 없는 오류가 발생했습니다.'
+    });
+  }
+});
+
+// 점검 결과 저장 API
+app.post('/api/check/results', async (req, res) => {
+  const { template_id, results } = req.body;
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    for (const result of results) {
+      await client.query(
+        `UPDATE evaluation_results 
+         SET result = $1, 
+             detail = $2,
+             checked_by_agent = true,
+             last_checked_at = NOW()
+         WHERE templateid = $3 AND item_id = $4`,
+        [result.status, result.detail, template_id, result.vul_id]
+      );
+    }
+
+    await client.query('COMMIT');
+    res.json({ success: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('❌ 결과 저장 실패:', err);
+    res.status(500).json({ error: '결과 저장 실패' });
+  } finally {
+    client.release();
   }
 });

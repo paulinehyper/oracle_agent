@@ -35,42 +35,35 @@
         <th>평가 취약점 수</th>
       </tr>
     </thead>
-    <tbody id="templateTable">
+    <tbody id="templateTableBody">
       <tr><td colspan="5" class="empty">로딩 중...</td></tr>
     </tbody>
   </table>
 </div>
 
 <script>
-  window.onload = async () => {
-    try {
-      const res = await fetch('/api/template/list');
-      const data = await res.json();
-      const tbody = document.getElementById('templateTable');
-      tbody.innerHTML = '';
-
-      if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="empty">등록된 템플릿이 없습니다.</td></tr>';
-        return;
-      }
-
-      data.forEach(item => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${item.template_id}</td>
-          <td>${item.template_name}</td>
-          <td>${item.target_type}</td>
-          <td>${item.basis_type || '-'}</td>
-          <td>${item.vuln_count}</td>
-        `;
-        tbody.appendChild(tr);
-      });
-    } catch (err) {
-      console.error('템플릿 목록 조회 실패:', err);
-      document.getElementById('templateTable').innerHTML =
-        '<tr><td colspan="5" class="empty">❌ 데이터 로드 실패</td></tr>';
-    }
-  };
+async function loadTemplates() {
+  const res = await fetch('/api/template/list');
+  const templates = await res.json();
+  const tbody = document.getElementById('templateTableBody');
+  tbody.innerHTML = '';
+  templates.forEach(t => {
+    const tr = document.createElement('tr');
+    tr.style.cursor = 'pointer';
+    tr.addEventListener('click', () => {
+      window.location.href = `/templateDetail.html?templateid=${t.template_id}`;
+    });
+    tr.innerHTML = `
+      <td>${t.template_id}</td>
+      <td>${t.template_name}</td>
+      <td>${t.target_type}</td>
+      <td>${t.basis_type || '-'}</td>
+      <td>${t.vuln_count}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+document.addEventListener('DOMContentLoaded', loadTemplates);
 </script>
 </body>
 </html>

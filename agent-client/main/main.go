@@ -4,4 +4,5 @@ import "agent-client/internal/agent"
 
 func main() {
 	agent.Start()
+	println("Hello, world!")
 }

@@ -120,6 +120,11 @@
 
     const templateid = getQueryParam("templateid");
 
+      const hostname = getQueryParam("hostname");
+          console.log("🧪 getQueryParam:", { hostname }); // 👈 추가
+          
+          const ip = getQueryParam("ip");
+
     if (!templateid) {
       document.getElementById("templateInfo").textContent = "❌ templateid가 제공되지 않았습니다.";
     } else {
@@ -134,9 +139,7 @@
             return;
           }
 
-          const hostname = getQueryParam("hostname");
-          const ip = getQueryParam("ip");
-
+        
           document.getElementById("templateInfo").textContent =
             `템플릿 이름: ${data[0].templatename} / 호스트: ${hostname || data[0].hostname} / IP: ${ip || data[0].ip || 'N/A'}`;
 
@@ -178,6 +181,7 @@
     }
 
     function runCheck(id, vulnid, hostname) {
+      console.log("🧪 runCheck called:", { id, vulnid, hostname }); // 👈 추가
       const statusCell = document.getElementById(`status-${id}`);
       statusCell.textContent = "⏳ 점검 중...";
       statusCell.className = "status 점검중";
@@ -205,7 +209,7 @@
 
                 const actionCell = document.getElementById(`action-${id}`);
                 actionCell.innerHTML = `
-                  <button onclick="runCheck(${id}, '${vulnid}', '${hostname}')">점검</button>
+                  <button onclick="runCheck(${id}, '${vulnid}', '${row.hostname || getQueryParam("hostname")}')">점검</button>
                   <button onclick="showDetail(\`${updated.detail.replace(/`/g, '\\`')}\`)">상세</button>
                 `;
               }

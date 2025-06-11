@@ -162,6 +162,10 @@
         <option value="Security">Security</option>
       </select>
       <div class="sub-targets-box" id="subTargets"></div>
+      <label for="assetSelect">자산 선택</label>
+      <select id="assetSelect" required>
+        <option value="">-- 자산을 선택하세요 --</option>
+      </select>
       <button type="submit">등록</button>
       <div class="status" id="status"></div>
     </form>
@@ -189,6 +193,8 @@
       <button onclick="resetForm(); closeModal();">닫기</button>
     </div>
   </div>
+  <div id="vulnItems"></div>
+  <button id="startCheckBtn">점검 시작</button>
   <script>
     const subTargetGroups = {
       Server: ['AIX', 'HP-UX', 'LINUX', 'SOLARIS', 'WIN', '웹서비스', 'Apache', 'WebtoB', 'IIS', 'Tomcat', 'JEUS'],
@@ -251,7 +257,8 @@
       }
     });
 
-    window.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', () => {
+      loadAssets();
       fetchVulnList();
     });
 
@@ -276,8 +283,9 @@
           vulname: row.children[2].textContent.trim()
         };
       });
+      const asset_id = document.getElementById('assetSelect').value;
 
-      if (!template_name || !target_type || !basis_type || vulns.length === 0) {
+      if (!template_name || !target_type || !basis_type || vulns.length === 0 || !asset_id) {
         status.textContent = "❗ 모든 항목을 입력하세요.";
         return;
       }
@@ -291,7 +299,7 @@
       const res = await fetch('/api/template', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ template_name, target_type, basis_type, vulns })
+        body: JSON.stringify({ template_name, target_type, basis_type, vulns, asset_id })
       });
 
       if (res.ok) {
@@ -311,6 +319,57 @@
       document.getElementById('subTargets').innerHTML = '';
       document.getElementById('vulnTableBody').innerHTML = '';
     }
+
+    async function loadAssets() {
+      const res = await fetch('/api/asset/list');
+      const assets = await res.json();
+      const select = document.getElementById('assetSelect');
+      assets.forEach(a => {
+        const option = document.createElement('option');
+        option.value = a.id;
+        option.textContent = `${a.name} (${a.hostname}, ${a.ip})`;
+        select.appendChild(option);
+      });
+    }
+
+    async function loadVulnItems() {
+      // 예시: 모든 취약점 항목을 불러온다고 가정
+      const res = await fetch('/api/vuln/list');
+      const items = await res.json();
+      const container = document.getElementById('vulnItems');
+      items.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${item.item_id || item.vulnid || '-'}</td>
+          <td>${item.item_name || item.vulname || '-'}</td>
+          <td>${item.risk_level || '-'}</td>
+          <td>${item.description || '-'}</td>
+        `;
+        container.appendChild(tr);
+      });
+    }
+    document.addEventListener('DOMContentLoaded', loadVulnItems);
+
+    document.getElementById('startCheckBtn').addEventListener('click', async function() {
+      const assetId = document.getElementById('assetSelect').value;
+      const checked = Array.from(document.querySelectorAll('.vuln-checkbox:checked')).map(cb => cb.value);
+      if (!assetId || checked.length === 0) {
+        alert('자산과 점검 항목을 선택하세요!');
+        return;
+      }
+      // 점검 초기화/실행 (예시)
+      const res = await fetch('/api/evaluation/init', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assetId, itemIds: checked })
+      });
+      if (!res.ok) {
+        alert('점검 시작 실패');
+        return;
+      }
+      // 결과 페이지로 이동 (파라미터 전달)
+      window.location.href = `/assessAction.html?assetid=${assetId}&itemids=${checked.join(',')}`;
+    });
   </script>
 </body>
 </html>

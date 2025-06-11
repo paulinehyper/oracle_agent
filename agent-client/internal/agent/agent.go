@@ -66,7 +66,7 @@ func performCheck(vulnid string) (string, string, string) {
 		return checkSNMP()
 	case "SRV-004":
 		return checkSMTP()
-	case "SRV-005":
+	case "srv-005":
 		return checkSMTPExpnVrfy()
 	case "SRV-006":
 		return checkSMTPLogLevel()
@@ -308,12 +308,46 @@ func checkSMTP() (string, string, string) {
 		}
 	}
 
-	if len(running) == 0 {
-		return "양호", "SMTP 관련 프로세스가 실행되고 있지 않음 → 양호", "미사용"
+	// 25번 포트 바인딩 여부 확인 (netstat, ss, 또는 lsof)
+	port25Open := false
+	// netstat 사용
+	netstatOut, err := exec.Command("sh", "-c", "netstat -tnlp 2>/dev/null | grep ':25 '").Output()
+	if err == nil && len(netstatOut) > 0 {
+		port25Open = true
+	}
+	// ss 사용 (netstat이 없을 경우)
+	if !port25Open {
+		ssOut, err := exec.Command("sh", "-c", "ss -tnlp 2>/dev/null | grep ':25 '").Output()
+		if err == nil && len(ssOut) > 0 {
+			port25Open = true
+		}
+	}
+	// lsof 사용 (추가 보조)
+	if !port25Open {
+		lsofOut, err := exec.Command("sh", "-c", "lsof -i :25 2>/dev/null | grep LISTEN").Output()
+		if err == nil && len(lsofOut) > 0 {
+			port25Open = true
+		}
 	}
 
-	detail := fmt.Sprintf("다음 SMTP 관련 프로세스가 확인되었습니다: %s", strings.Join(running, ","))
+	if len(running) == 0 && !port25Open {
+		return "양호", "SMTP 관련 프로세스가 실행되고 있지 않고 25번 포트도 열려있지 않음 → 양호", "미사용"
+	}
+
+	detail := ""
+	if len(running) > 0 {
+		detail += fmt.Sprintf("다음 SMTP 관련 프로세스가 확인되었습니다: %s. ", strings.Join(running, ","))
+	}
+	if port25Open {
+		detail += "25번 포트가 열려 있음 (SMTP 서비스가 외부에 노출될 수 있음)."
+	} else {
+		detail += "25번 포트는 열려 있지 않음."
+	}
+
 	serviceStatus := strings.Join(running, ",")
+	if port25Open && len(running) == 0 {
+		serviceStatus = "25포트만 오픈"
+	}
 
 	return "취약", detail, serviceStatus
 }
