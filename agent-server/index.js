@@ -1065,3 +1065,17 @@ app.get('/api/confpath', async (req, res) => {
     res.json({ confpath: '' });
   }
 });
+
+// Node.js
+app.get('/api/serviceon', async (req, res) => {
+  const { host_name } = req.query;
+  const result = await pool.query(
+    `SELECT serviceon FROM evaluation_results WHERE host_name = $1 AND item_id = 'SRV-004' LIMIT 1`,
+    [host_name]
+  );
+  if (result.rows.length > 0) {
+    res.json({ serviceon: result.rows[0].serviceon });
+  } else {
+    res.json({ serviceon: '' });
+  }
+});
