@@ -5,7 +5,8 @@
   <title>템플릿 상세 정보</title>
   <style>
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f9ff; }
-    .container { max-width: 800px; margin: 40px auto; background: #fff; border-radius: 12px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); padding: 30px; }
+    .container { max-width: 800px; margin: 40px auto; background: #fff; border-radius: 12px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); padding: 30px; display: flex; gap: 24px; }
+    .container > div { flex: 1; }
     h1 { color: #0056b3; }
     table { width: 100%; border-collapse: collapse; margin-top: 20px; }
     th, td { border: 1px solid #e0e0e0; padding: 10px; }
@@ -52,72 +53,85 @@
       background-color: #6c757d;
       color: white;
     }
+    .detail-overlay {
+      position: fixed;
+      top: 0; right: 0; bottom: 0; left: 0;
+      background: rgba(0,0,0,0.18);
+      z-index: 2000;
+      display: flex;
+      justify-content: flex-end;
+      align-items: flex-end; /* 아래에서 위로 */
+      transition: background 0.2s;
+    }
+    .detail-panel {
+      background: #f8f9fa;
+      width: 320px; /* 넓이 줄임 */
+      max-width: 90vw;
+      height: 50vh; /* 화면의 절반 높이 */
+      box-shadow: 0 -2px 16px rgba(0,0,0,0.10);
+      border-radius: 16px 16px 0 0;
+      padding: 28px 28px 28px 24px;
+      position: relative;
+      animation: slideInUp 0.25s;
+      display: flex;
+      flex-direction: column;
+    }
+    @keyframes slideInUp {
+      from { transform: translateY(100%);}
+      to { transform: translateY(0);}
+    }
+    .close-btn {
+      position: absolute;
+      top: 18px; right: 18px;
+      background: none;
+      border: none;
+      font-size: 2rem;
+      color: #888;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+    .close-btn:hover { color: #d00; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1 id="templateName">템플릿 상세 정보</h1>
-    <div id="templateInfo"></div>
-    <button onclick="startCheck()" class="check-btn">점검 시작</button>
-    <h2>포함된 취약점 항목</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>취약점 ID</th>
-          <th>취약점명</th>
-          <th>위험도</th>
-          <th>서비스</th>         <!-- 추가 -->
-          <th>설정 파일 경로</th> <!-- 추가 -->
-          <th>점검</th>
-          <th>결과</th>
-          <th>상세</th>
-        </tr>
-      </thead>
-      <tbody id="vulnTableBody"></tbody>
-    </table>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-    <label for="assetSelect"><strong>점검할 자산 선택:</strong></label>
-    <select id="assetSelect" required>
-      <option value="">-- 자산을 선택하세요 --</option>
-    </select>
-    <div id="status"></div>
+    <div>
+      <h1 id="templateName">템플릿 상세 정보</h1>
+      <div id="templateInfo"></div>
+      <button onclick="startCheckAll()" class="check-btn" style="margin-bottom:16px;">전체 점검</button>
+      <h2>포함된 취약점 항목</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>취약점 ID</th>
+            <th>취약점명</th>
+            <th>위험도</th>
+            <th>서비스</th>
+            <th>설정 파일 경로</th>
+            <th>점검</th>
+            <th>결과</th>
+            <th>상세</th>
+          </tr>
+        </thead>
+        <tbody id="vulnTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+  <!-- container 바깥에 추가 -->
+  <div id="detailOverlay" class="detail-overlay" style="display:none;">
+    <div id="detailPanel" class="detail-panel">
+      <button onclick="closeDetailPanel()" class="close-btn" style="position:absolute;top:18px;right:18px;">×</button>
+      <h3 style="margin-top:0;">상세 내역</h3>
+      <div id="detailPanelContent" style="white-space:pre-line; font-size:15px; color:#333; max-height:60vh; overflow:auto;"></div>
+      <button onclick="closeDetailPanel()" class="check-btn" style="margin-top:auto;align-self:flex-end;">닫기</button>
+    </div>
   </div>
   <script> 
     let templateId = null;
     let templateName = '';
+    // 전역에 선언
+    let resultMap = {};
+
     async function loadTemplateDetail() {
       const params = new URLSearchParams(window.location.search);
       templateId = params.get('templateid');
@@ -165,7 +179,7 @@
         const results = await resultsRes.json();
         
         // 결과를 vul_id를 키로 하는 맵으로 변환
-        const resultMap = {};
+        resultMap = {};
         results.forEach(r => {
           resultMap[r.vulnid] = r;
         });
@@ -180,12 +194,12 @@
             <td>${item.vul_id}</td>
             <td>${item.item_name}</td>
             <td>${item.risk_level || '-'}</td>
-            <td>${result.serviceon || '-'}</td>   <!-- 반드시 DB에서 온 serviceon 사용 -->
+            <td>${result.serviceon || '-'}</td>
             <td>${result.confpath || '-'}</td>
             <td>
-              <button onclick="startCheck('${item.vul_id}')" class="check-btn" 
-                      ${result.result === '점검 중' ? 'disabled' : ''}>
-                ${result.result === '점검 중' ? '점검 중...' : '점검 시작'}
+              <button onclick="startCheck('${item.vul_id}')" class="check-btn"
+                ${result.result === '점검 중' ? 'disabled' : ''}>
+                ${result.result === '점검 중' ? '점검 중...' : '점검'}
               </button>
             </td>
             <td>
@@ -193,7 +207,9 @@
                 ${result.result || '미점검'}
               </span>
             </td>
-            <td>${result.detail || '-'}</td>
+            <td>
+              <button onclick="showDetailPanel('${item.vul_id}')" class="check-btn" style="padding:2px 8px;font-size:12px;">상세 열기</button>
+            </td>
           `;
           tbody.appendChild(tr);
         });
@@ -275,8 +291,18 @@
         alert('❌ 점검 시작에 실패했습니다.');
       }
     }
+    async function startCheckAll() {
+      // 취약점 목록 가져오기
+      const itemsRes = await fetch(`/api/template/${templateId}/items`);
+      const items = await itemsRes.json();
+
+      for (const item of items) {
+        await startCheck(item.vul_id);
+      }
+      alert('전체 점검이 시작되었습니다.');
+    }
     let pollingInterval = null;
-    const CHECK_TIMEOUT_MS = 2 * 60 * 1000; // 2분
+    const CHECK_TIMEOUT_MS = 10 * 60 * 1000; // 10분으로 변경
 
     function startPollingResults(vul_id) {
       if (pollingInterval) clearInterval(pollingInterval);
@@ -296,7 +322,7 @@
             return;
           }
 
-          // 2. 점검 중 타임아웃(2분) 초과시 "미점검"으로 리셋
+          // 2. 점검 중 타임아웃(10분) 초과시 "미점검"으로 리셋
           if (result && result.result === '점검 중' && Date.now() - startTime > CHECK_TIMEOUT_MS) {
             clearInterval(pollingInterval);
             // 서버에 상태 리셋 요청 (PATCH 또는 POST)
@@ -316,6 +342,35 @@
         }
       }, 3000);
     }
+    function toggleDetail(id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (el.style.display === 'none') {
+        el.style.display = 'block';
+      } else {
+        el.style.display = 'none';
+      }
+    }
+    function showDetailPanel(vul_id) {
+      const result = resultMap[vul_id] || {};
+      const overlay = document.getElementById('detailOverlay');
+      const content = document.getElementById('detailPanelContent');
+      content.textContent = result.detail || '-';
+      overlay.style.display = 'flex';
+      // 바깥 클릭 시 닫기
+      overlay.onclick = function(e) {
+        if (e.target === overlay) closeDetailPanel();
+      };
+    }
+    function closeDetailPanel() {
+      document.getElementById('detailOverlay').style.display = 'none';
+    }
+    document.addEventListener('keydown', function(e) {
+      const overlay = document.getElementById('detailOverlay');
+      if (overlay.style.display === 'flex' && e.key === 'Escape') {
+        closeDetailPanel();
+      }
+    });
   </script>
 </body>
 </html>
