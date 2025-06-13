@@ -358,7 +358,8 @@ app.post('/api/send-command', async (req, res) => {
            checked_by_agent = false,
            check_start_time = NOW(),
            check_end_time = NULL
-       WHERE id = $1`, [id]
+       WHERE id = $1`,
+      [id]
     );
 
     res.status(200).json({ message: '✅ 명령 저장 완료', ip });
@@ -957,6 +958,24 @@ app.post('/api/check/start', async (req, res) => {
        WHERE id = $1`,
       [evalId]
     );
+
+    // 30초 후에 결과가 없으면 미점검으로 변경
+    setTimeout(async () => {
+      const checkRes = await pool.query(
+        `SELECT result FROM evaluation_results WHERE id = $1`,
+        [evalId]
+      );
+      
+      if (checkRes.rows[0]?.result === '점검 중') {
+        await pool.query(
+          `UPDATE evaluation_results 
+           SET result = '미점검',
+               check_end_time = NOW()
+           WHERE id = $1`,
+          [evalId]
+        );
+      }
+    }, 30000);
     
     res.json({ 
       success: true,
@@ -1002,3 +1021,30 @@ app.post('/api/check/results', async (req, res) => {
     client.release();
   }
 });
+
+// 점검 상태 리셋 API
+app.post('/api/evaluation/reset', async (req, res) => {
+  const { template_id, vul_id } = req.body;
+  try {
+    await pool.query(
+      `UPDATE evaluation_results
+       SET result = '미점검'
+       WHERE templateid = $1 AND item_id = $2 AND result = '점검 중'`,
+      [template_id, vul_id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('점검 상태 리셋 실패:', err);
+    res.status(500).json({ error: '서버 오류' });
+  }
+});
+
+// 2분 이상 점검 중인 항목 미점검으로 변경 (주기적 작업)
+setInterval(async () => {
+  await pool.query(`
+    UPDATE evaluation_results
+    SET result = '미점검'
+    WHERE result = '점검 중'
+      AND check_start_time < NOW() - INTERVAL '2 minutes'
+  `);
+}, 60 * 1000);

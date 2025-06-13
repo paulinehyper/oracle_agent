@@ -61,118 +61,208 @@ func Start() {
 }
 
 func performCheck(vulnid string) (string, string, string) {
-	switch vulnid {
+	switch strings.ToUpper(vulnid) {
 	case "SRV-001":
 		return checkSNMP()
+		//case "SRV-002":
+		//return checkPassword()
+		//case "SRV-003":
+		//	return checkPassword()
 	case "SRV-004":
 		return checkSMTP()
-	case "srv-005":
+	case "SRV-005":
 		return checkSMTPExpnVrfy()
 	case "SRV-006":
 		return checkSMTPLogLevel()
+	case "SRV-007":
+		// sendmail 서비스가 실행 중인지 확인
+		out, err := exec.Command("sh", "-c", "ps -ef | grep -w sendmail | grep -v grep").Output()
+		if err == nil && len(out) > 0 {
+			sendmailPath := getSendmailPath()
+			if sendmailPath == "" {
+				return "미점검", "sendmail 바이너리 경로를 찾을 수 없습니다.", "Sendmail"
+			}
+			versionOut, vErr := exec.Command("sh", "-c", fmt.Sprintf("echo $Z | %s -bt -d0", sendmailPath)).Output()
+			if vErr == nil {
+				versionFull := strings.TrimSpace(string(versionOut))
+				re := regexp.MustCompile(`(?i)Version\s*([0-9]+\.[0-9]+\.[0-9]+)`)
+				shortVer := re.FindString(versionFull)
+				if shortVer == "" {
+					shortVer = "버전 정보 파싱 실패"
+				}
+				// 버전 비교는 기존대로
+				matches := re.FindStringSubmatch(versionFull)
+				if len(matches) == 2 {
+					verParts := strings.Split(matches[1], ".")
+					major, _ := strconv.Atoi(verParts[0])
+					minor, _ := strconv.Atoi(verParts[1])
+					patch, _ := strconv.Atoi(verParts[2])
+					if major > 8 ||
+						(major == 8 && minor > 14) ||
+						(major == 8 && minor == 14 && patch >= 9) {
+						return "양호", fmt.Sprintf("Sendmail 서비스 실행 중, %s (양호, 8.14.9 이상)", shortVer), "Sendmail"
+					} else {
+						return "취약", fmt.Sprintf("Sendmail 서비스 실행 중, %s (취약, 8.14.9 미만)", shortVer), "Sendmail"
+					}
+				}
+				return "미점검", fmt.Sprintf("Sendmail 서비스 실행 중, %s", shortVer), "Sendmail"
+			} else {
+				return "미점검", "Sendmail 버전 확인 실패", "Sendmail"
+			}
+		} else {
+			return "미점검", "Sendmail 서비스가 실행 중이지 않음", "미사용"
+		}
 	default:
 		return "미점검", "❓ 알 수 없는 항목", "N/A"
 	}
 }
+
 func detectMTA() string {
-	processes := map[string]string{
-		"sendmail": "sendmail",
-		"master":   "postfix", // postfix의 메인 프로세스 이름은 master
-		"exim":     "exim",
+	// Sendmail 확인
+	cmd := exec.Command("pgrep", "-x", "sendmail")
+	if err := cmd.Run(); err == nil {
+		return "Sendmail"
 	}
 
-	for proc, name := range processes {
-		cmd := exec.Command("pgrep", "-x", proc)
-		if err := cmd.Run(); err == nil {
-			return name
+	// Postfix 확인 (master 프로세스)
+	cmd = exec.Command("pgrep", "-x", "master")
+	if err := cmd.Run(); err == nil {
+		// master 프로세스가 postfix의 것인지 확인
+		cmd = exec.Command("ps", "-p", "1", "-o", "comm=")
+		output, err := cmd.Output()
+		if err == nil && strings.Contains(strings.ToLower(string(output)), "postfix") {
+			return "Postfix"
 		}
 	}
-	return "unknown"
+
+	// 추가 확인: netstat으로 25번 포트 리스닝 확인
+	cmd = exec.Command("netstat", "-tuln")
+	output, err := cmd.Output()
+	if err == nil {
+		lines := strings.Split(string(output), "\n")
+		for _, line := range lines {
+			if strings.Contains(line, ":25") {
+				// 25번 포트가 열려있지만 MTA 프로세스를 찾지 못한 경우
+				return "Unknown"
+			}
+		}
+	}
+
+	return "None"
 }
 
 func checkSMTPLogLevel() (string, string, string) {
-	mta := detectMTA()
-	status := "미점검"
-	detail := ""
-	service := ""
+	var status = "양호"
+	var detailParts []string
+	var service string
 
-	switch mta {
-	case "sendmail":
-		paths := []string{"/etc/mail/sendmail.cf", "/etc/sendmail.cf"}
-		found := false
-		for _, path := range paths {
-			data, err := os.ReadFile(path)
-			if err != nil {
-				continue
-			}
-			content := string(data)
-			re := regexp.MustCompile(`(?i)LogLevel\s*[:=]?\s*(\d+)`)
-			matches := re.FindStringSubmatch(content)
-			if len(matches) == 2 {
+	// SRV-004와 동일한 서비스 감지 로직
+	targets := []string{"sendmail", "exim", "opensmtpd", "qmail"}
+	found := false
+
+	postfixCmd := exec.Command("sh", "-c", "postfix status")
+	if err := postfixCmd.Run(); err == nil {
+		service = "Postfix"
+		found = true
+	}
+	if !found {
+		for _, proc := range targets {
+			cmd := fmt.Sprintf("ps -ef | grep -w %s | grep -v grep", proc)
+			out, err := exec.Command("sh", "-c", cmd).Output()
+			if err == nil && len(out) > 0 {
+				service = strings.Title(proc)
 				found = true
-				level, _ := strconv.Atoi(matches[1])
-				if level >= 9 {
-					status = "양호"
-					detail = fmt.Sprintf("Sendmail 설정(%s): LogLevel=%d (기본값 이상) → 양호", path, level)
-					service = fmt.Sprintf("LogLevel=%d", level)
-				} else {
-					status = "취약"
-					detail = fmt.Sprintf("Sendmail 설정(%s): LogLevel=%d (기본값 미만) → 취약", path, level)
-					service = fmt.Sprintf("LogLevel=%d", level)
-				}
 				break
 			}
 		}
-		if !found {
-			status = "취약"
-			detail = "Sendmail 설정에서 LogLevel 항목을 찾을 수 없음 → 취약"
-			service = "LogLevel 미설정"
-		}
-
-	case "postfix":
-		// main.cf에서 debug_peer_level 확인
-		content, err := os.ReadFile("/etc/postfix/main.cf")
-		if err == nil {
-			cfg := string(content)
-			re := regexp.MustCompile(`(?i)debug_peer_level\s*=\s*(\d+)`)
-			matches := re.FindStringSubmatch(cfg)
-			if len(matches) == 2 {
-				level, _ := strconv.Atoi(matches[1])
-				if level >= 2 {
-					status = "양호"
-					detail = fmt.Sprintf("Postfix 설정: debug_peer_level=%d (기본값 이상) → 양호", level)
-					service = fmt.Sprintf("debug_peer_level=%d", level)
-				} else {
-					status = "취약"
-					detail = fmt.Sprintf("Postfix 설정: debug_peer_level=%d (기본값 미만) → 취약", level)
-					service = fmt.Sprintf("debug_peer_level=%d", level)
-				}
-			} else {
-				status = "취약"
-				detail = "Postfix 설정에 debug_peer_level 항목이 없음 → 취약"
-				service = "debug_peer_level 미설정"
-			}
-		}
-
-		// syslog 설정 파일 존재 여부만 확인
-		syslogPaths := []string{"/etc/syslog.conf", "/etc/rsyslog.conf"}
-		for _, path := range syslogPaths {
-			if _, err := os.Stat(path); err == nil {
-				detail += fmt.Sprintf("\nSyslog 설정 파일 존재 확인됨: %s", path)
-			}
-		}
-		matches, _ := filepath.Glob("/etc/rsyslog.d/*.conf")
-		if len(matches) > 0 {
-			detail += fmt.Sprintf("\nrsyslog.d에 %d개 설정 파일 존재", len(matches))
-		}
-
-	default:
-		status = "미점검"
-		detail = "SMTP 서비스 데몬이 인식되지 않음 (Sendmail/Postfix 아님)"
-		service = "미확인"
 	}
 
-	return status, detail, service
+	// 만약 sendmail이 감지되면 sendmail 설정만 검사
+	if service == "Sendmail" {
+		sendmailPaths := []string{"/etc/mail/sendmail.cf", "/etc/sendmail.cf", "/usr/lib/sendmail.cf"}
+		foundSetting := false
+		for _, path := range sendmailPaths {
+			if content, err := os.ReadFile(path); err == nil {
+				lines := strings.Split(string(content), "\n")
+				for _, line := range lines {
+					line = strings.TrimSpace(line)
+					// 주석(#)으로 시작하는 행은 무시
+					if strings.HasPrefix(line, "#") {
+						continue
+					}
+					if strings.HasPrefix(line, "O LogLevel=") {
+						foundSetting = true
+						parts := strings.Split(line, "=")
+						if len(parts) == 2 {
+							level, err := strconv.Atoi(strings.TrimSpace(parts[1]))
+							if err == nil {
+								if level >= 9 {
+									detailParts = append(detailParts, fmt.Sprintf("Sendmail LogLevel=%d (양호)", level))
+									return "양호", strings.Join(detailParts, "\n"), "Sendmail"
+								} else {
+									detailParts = append(detailParts, fmt.Sprintf("Sendmail LogLevel=%d (취약, 9 미만)", level))
+									return "취약", strings.Join(detailParts, "\n"), "Sendmail"
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		if !foundSetting {
+			return "취약", "Sendmail LogLevel 설정 미발견 (취약)", "Sendmail"
+		}
+	}
+
+	// sendmail이 아니면 기존대로 Postfix/Exim 설정 검사
+	// 1. Postfix 설정 검사
+	mainCf := "/etc/postfix/main.cf"
+	if content, err := os.ReadFile(mainCf); err == nil {
+		re := regexp.MustCompile(`(?m)^debug_peer_level\s*=\s*(\d+)`)
+		matches := re.FindStringSubmatch(string(content))
+		if len(matches) == 2 {
+			level, _ := strconv.Atoi(matches[1])
+			if level >= 2 {
+				detailParts = append(detailParts, fmt.Sprintf("Postfix debug_peer_level=%d (양호)", level))
+			} else {
+				status = "취약"
+				detailParts = append(detailParts, fmt.Sprintf("Postfix debug_peer_level=%d (취약, 2 미만)", level))
+			}
+		} else {
+			status = "취약"
+			detailParts = append(detailParts, "Postfix debug_peer_level 설정 미발견 (취약)")
+		}
+	}
+
+	// 3. Exim 설정 검사
+	eximPaths := []string{
+		"/etc/exim4/exim4.conf.template",
+		"/etc/exim/exim4.conf",
+	}
+	for _, path := range eximPaths {
+		if content, err := os.ReadFile(path); err == nil {
+			re := regexp.MustCompile(`(?m)^log_level\s*=\s*(\d+)`)
+			m := re.FindStringSubmatch(string(content))
+			level := 5 // Exim 기본값
+			if len(m) == 2 {
+				level, _ = strconv.Atoi(m[1])
+			}
+			if level >= 5 {
+				detailParts = append(detailParts, fmt.Sprintf("Exim log_level=%d (양호)", level))
+			} else {
+				status = "취약"
+				detailParts = append(detailParts, fmt.Sprintf("Exim log_level=%d (취약, 5 미만)", level))
+			}
+		}
+	}
+
+	// 결과 정리
+	if len(detailParts) == 0 {
+		status = "미점검"
+		detailParts = append(detailParts, "SMTP 관련 설정 파일을 찾을 수 없음")
+	}
+
+	return status, strings.Join(detailParts, "\n"), service
 }
 
 func checkSMTPExpnVrfy() (string, string, string) {
@@ -427,6 +517,59 @@ func checkCommunityStringComplexity(s string) bool {
 	return lengthOk && classes >= 2
 }
 
+func checkSendmailLogLevel() (string, string, string) {
+	// MTA 감지
+	mta := detectMTA()
+	if mta == "None" {
+		return "취약", "SMTP 서비스 데몬이 실행 중이지 않습니다. (Sendmail/Postfix 없음)", "N/A"
+	}
+	if mta != "Sendmail" {
+		return "취약", fmt.Sprintf("현재 실행 중인 MTA는 %s입니다. Sendmail 설정을 확인할 수 없습니다.", mta), "N/A"
+	}
+
+	// Sendmail 설정 파일 경로
+	sendmailCfPath := "/etc/mail/sendmail.cf"
+
+	// 파일 존재 여부 확인
+	if _, err := os.Stat(sendmailCfPath); os.IsNotExist(err) {
+		return "취약", "Sendmail 설정 파일(/etc/mail/sendmail.cf)이 존재하지 않습니다.", "N/A"
+	}
+
+	// 파일 읽기
+	content, err := os.ReadFile(sendmailCfPath)
+	if err != nil {
+		return "취약", fmt.Sprintf("Sendmail 설정 파일 읽기 실패: %v", err), "N/A"
+	}
+
+	// LogLevel 설정 찾기
+	lines := strings.Split(string(content), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "O LogLevel=") {
+			// LogLevel 값 추출
+			parts := strings.Split(line, "=")
+			if len(parts) != 2 {
+				return "취약", "LogLevel 설정 형식이 올바르지 않습니다.", "N/A"
+			}
+
+			// 숫자로 변환
+			level, err := strconv.Atoi(strings.TrimSpace(parts[1]))
+			if err != nil {
+				return "취약", fmt.Sprintf("LogLevel 값이 올바른 숫자가 아닙니다: %v", err), "N/A"
+			}
+
+			// 9 이상인지 확인
+			if level >= 9 {
+				return "양호", fmt.Sprintf("LogLevel이 %d로 적절하게 설정되어 있습니다.", level), "N/A"
+			} else {
+				return "취약", fmt.Sprintf("LogLevel이 %d로 설정되어 있어 로깅이 충분하지 않습니다. (권장: 9 이상)", level), "N/A"
+			}
+		}
+	}
+
+	return "취약", "LogLevel 설정이 없습니다. 로깅이 충분하지 않습니다. (권장: 9 이상)", "N/A"
+}
+
 func sendResult(res Result) {
 	data, _ := json.Marshal(res)
 	resp, err := http.Post(serverURL+"/api/result", "application/json", bytes.NewBuffer(data))
@@ -437,4 +580,19 @@ func sendResult(res Result) {
 		fmt.Println("📤 결과 전송 완료:", res)
 		fmt.Println("📥 서버 응답:", string(body))
 	}
+}
+
+func getSendmailPath() string {
+	paths := []string{
+		"/usr/lib/sendmail",
+		"/usr/sbin/sendmail",
+		"/usr/bin/sendmail",
+		"/etc/mail/sendmail",
+	}
+	for _, path := range paths {
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+	}
+	return ""
 }

@@ -183,6 +183,15 @@
       loadAssets();
     });
     async function startCheck(vul_id) {
+      // 이미 점검 중이면 함수 종료 (이중 방어)
+      const resultsRes = await fetch(`/api/template/by-id/${templateId}`);
+      const results = await resultsRes.json();
+      const result = results.find(r => r.vulnid === vul_id);
+      if (result && result.result === '점검 중') {
+        alert('이미 점검 중입니다.');
+        return;
+      }
+
       try {
         // 먼저 evaluation_results 초기화
         const initRes = await fetch('/api/evaluation/init', {
@@ -231,23 +240,40 @@
       }
     }
     let pollingInterval = null;
+    const CHECK_TIMEOUT_MS = 2 * 60 * 1000; // 2분
+
     function startPollingResults(vul_id) {
-      // 이전 폴링 중지
-      if (pollingInterval) {
-        clearInterval(pollingInterval);
-      }
-      
-      // 3초마다 결과 확인
+      if (pollingInterval) clearInterval(pollingInterval);
+
+      const startTime = Date.now();
+
       pollingInterval = setInterval(async () => {
         try {
           const res = await fetch(`/api/template/by-id/${templateId}`);
           const results = await res.json();
           const result = results.find(r => r.vulnid === vul_id);
-          
+
+          // 1. 점검 완료시 폴링 중지
           if (result && result.result !== '점검 중') {
-            // 점검이 완료되면 폴링 중지
             clearInterval(pollingInterval);
-            loadVulnItems(); // 목록 새로고침
+            loadVulnItems();
+            return;
+          }
+
+          // 2. 점검 중 타임아웃(2분) 초과시 "미점검"으로 리셋
+          if (result && result.result === '점검 중' && Date.now() - startTime > CHECK_TIMEOUT_MS) {
+            clearInterval(pollingInterval);
+            // 서버에 상태 리셋 요청 (PATCH 또는 POST)
+            await fetch('/api/evaluation/reset', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                template_id: templateId,
+                vul_id: vul_id
+              })
+            });
+            alert('점검이 너무 오래 걸려 "미점검"으로 초기화합니다.');
+            loadVulnItems();
           }
         } catch (err) {
           console.error('결과 확인 실패:', err);
@@ -256,4 +282,4 @@
     }
   </script>
 </body>
-</html> 
+</html>
