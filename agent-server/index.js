@@ -289,7 +289,9 @@ app.get('/api/template/by-id/:templateid', async (req, res) => {
          r.service_status,
          r.check_start_time,
          r.check_end_time,
-         r.serviceon,  -- serviceon 
+         r.serviceon,  -- serviceon,
+         r.confpath,  -- confpath 
+
          CASE WHEN r.result = '양호' THEN r.vuln_score ELSE 0 END AS vuln_last_score
        FROM evaluation_results r
        JOIN template_vuln t 
@@ -309,7 +311,7 @@ app.get('/api/template/by-id/:templateid', async (req, res) => {
 
 // 점검 결과 저장
 app.post('/api/result', async (req, res) => {
-  const { host_name, item_id, result, detail, service_status, serviceon } = req.body;
+  const { host_name, item_id, result, detail, service_status, serviceon, confpath } = req.body;
   console.log('점검 결과 저장 요청:', { host_name, item_id, result, serviceon }); // 로그 추가
   try {
     const updateResult = await pool.query(
@@ -317,12 +319,13 @@ app.post('/api/result', async (req, res) => {
        SET result = $1,
            detail = $2,
            service_status = $3,
-           serviceon = $4,                -- serviceon 저장
+           serviceon = $4,
+           confpath = $5,
            checked_by_agent = true,
            last_checked_at = NOW(),
            check_end_time = NOW()
-       WHERE host_name = $5 AND item_id = $6`,
-      [result, detail, service_status, serviceon, host_name, item_id]
+       WHERE host_name = $6 AND item_id = $7`,
+      [result, detail, service_status, serviceon, confpath, host_name, item_id]
     );
     if (updateResult.rowCount === 0) {
       console.warn(`⚠️ 업데이트 대상 없음: host=${host_name}, item_id=${item_id}`);
@@ -1048,3 +1051,17 @@ setInterval(async () => {
       AND check_start_time < NOW() - INTERVAL '2 minutes'
   `);
 }, 60 * 1000);
+
+// confpath 조회 API
+app.get('/api/confpath', async (req, res) => {
+  const { host_name } = req.query;
+  const result = await pool.query(
+    `SELECT confpath FROM evaluation_results WHERE host_name = $1 AND item_id = 'SRV-004' LIMIT 1`,
+    [host_name]
+  );
+  if (result.rows.length > 0) {
+    res.json({ confpath: result.rows[0].confpath });
+  } else {
+    res.json({ confpath: '' });
+  }
+});

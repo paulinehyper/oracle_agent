@@ -180,8 +180,8 @@
             <td>${item.vul_id}</td>
             <td>${item.item_name}</td>
             <td>${item.risk_level || '-'}</td>
-            <td>${result.serviceon || '-'}</td>       <!-- 여기! -->
-            <td>${item.confpath || '-'}</td>
+            <td>${result.serviceon || '-'}</td>
+            <td>${result.confpath || '-'}</td> <!-- confpath 표시 -->
             <td>
               <button onclick="startCheck('${item.vul_id}')" class="check-btn" 
                       ${result.result === '점검 중' ? 'disabled' : ''}>
