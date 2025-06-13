@@ -27,7 +27,8 @@ type Result struct {
 	ItemID        string `json:"item_id"`
 	Result        string `json:"result"`
 	Detail        string `json:"detail"`
-	ServiceStatus string `json:"service_status"` // ✅ 서비스 상태 필드
+	ServiceStatus string `json:"service_status"`
+	Serviceon     string `json:"serviceon"` // ✅ 서비스명 필드 추가
 }
 
 const serverURL = "http://localhost:3000"
@@ -46,24 +47,26 @@ func Start() {
 
 		fmt.Println("🛠️ 수신된 점검 명령:", cmd)
 
-		result, detail, service := performCheck(cmd.VulnID)
+		result, detail, serviceStatus, serviceon := performCheck(cmd.VulnID)
 
 		sendResult(Result{
 			HostName:      cmd.Host,
 			ItemID:        cmd.VulnID,
 			Result:        result,
 			Detail:        detail,
-			ServiceStatus: service,
+			ServiceStatus: serviceStatus,
+			Serviceon:     serviceon, // ✅ 서비스명 포함
 		})
 
 		time.Sleep(2 * time.Second)
 	}
 }
 
-func performCheck(vulnid string) (string, string, string) {
+func performCheck(vulnid string) (string, string, string, string) {
 	switch strings.ToUpper(vulnid) {
 	case "SRV-001":
-		return checkSNMP()
+		result, detail, serviceStatus := checkSNMP()
+		return result, detail, serviceStatus, "-"
 		//case "SRV-002":
 		//return checkPassword()
 		//case "SRV-003":
@@ -71,16 +74,18 @@ func performCheck(vulnid string) (string, string, string) {
 	case "SRV-004":
 		return checkSMTP()
 	case "SRV-005":
-		return checkSMTPExpnVrfy()
+		result, detail, serviceStatus := checkSMTPExpnVrfy()
+		return result, detail, serviceStatus, "-"
 	case "SRV-006":
-		return checkSMTPLogLevel()
+		result, detail, serviceStatus := checkSMTPLogLevel()
+		return result, detail, serviceStatus, "-"
 	case "SRV-007":
 		// sendmail 서비스가 실행 중인지 확인
 		out, err := exec.Command("sh", "-c", "ps -ef | grep -w sendmail | grep -v grep").Output()
 		if err == nil && len(out) > 0 {
 			sendmailPath := getSendmailPath()
 			if sendmailPath == "" {
-				return "미점검", "sendmail 바이너리 경로를 찾을 수 없습니다.", "Sendmail"
+				return "미점검", "sendmail 바이너리 경로를 찾을 수 없습니다.", "Sendmail", "-"
 			}
 			versionOut, vErr := exec.Command("sh", "-c", fmt.Sprintf("echo $Z | %s -bt -d0", sendmailPath)).Output()
 			if vErr == nil {
@@ -100,41 +105,42 @@ func performCheck(vulnid string) (string, string, string) {
 					if major > 8 ||
 						(major == 8 && minor > 14) ||
 						(major == 8 && minor == 14 && patch >= 9) {
-						return "양호", fmt.Sprintf("Sendmail 서비스 실행 중, %s (양호, 8.14.9 이상)", shortVer), "Sendmail"
+						return "양호", fmt.Sprintf("Sendmail 서비스 실행 중, %s (양호, 8.14.9 이상)", shortVer), "Sendmail", "Sendmail"
 					} else {
-						return "취약", fmt.Sprintf("Sendmail 서비스 실행 중, %s (취약, 8.14.9 미만)", shortVer), "Sendmail"
+						return "취약", fmt.Sprintf("Sendmail 서비스 실행 중, %s (취약, 8.14.9 미만)", shortVer), "Sendmail", "Sendmail"
 					}
 				}
-				return "미점검", fmt.Sprintf("Sendmail 서비스 실행 중, %s", shortVer), "Sendmail"
+				return "미점검", fmt.Sprintf("Sendmail 서비스 실행 중, %s", shortVer), "Sendmail", "Sendmail"
 			} else {
-				return "미점검", "Sendmail 버전 확인 실패", "Sendmail"
+				return "미점검", "Sendmail 버전 확인 실패", "Sendmail", "Sendmail"
 			}
 		} else {
-			return "미점검", "Sendmail 서비스가 실행 중이지 않음", "미사용"
+			return "미점검", "Sendmail 서비스가 실행 중이지 않음", "미사용", "-"
 		}
 	case "SRV-008":
-		return checkSendmailSecurityParams()
+		result, detail, serviceStatus := checkSendmailSecurityParams()
+		return result, detail, serviceStatus, "Sendmail"
 	case "SRV-009":
 		// sendmail 설정 파일 경로는 SRV-006과 동일하게 사용
 		sendmailCfPath := getSendmailCfPath()
 		if sendmailCfPath == "" {
-			return "미점검", "Sendmail 설정 파일을 찾을 수 없습니다.", "Sendmail"
+			return "미점검", "Sendmail 설정 파일을 찾을 수 없습니다.", "Sendmail", "-"
 		}
 
 		// 버전 확인
 		sendmailPath := getSendmailPath()
 		if sendmailPath == "" {
-			return "미점검", "sendmail 바이너리 경로를 찾을 수 없습니다.", "Sendmail"
+			return "미점검", "sendmail 바이너리 경로를 찾을 수 없습니다.", "Sendmail", "-"
 		}
 		versionOut, vErr := exec.Command("sh", "-c", fmt.Sprintf("echo $Z | %s -bt -d0", sendmailPath)).Output()
 		if vErr != nil {
-			return "미점검", "Sendmail 버전 확인 실패", "Sendmail"
+			return "미점검", "Sendmail 버전 확인 실패", "Sendmail", "-"
 		}
 		versionFull := strings.TrimSpace(string(versionOut))
 		re := regexp.MustCompile(`(?i)Version\s*([0-9]+)\.([0-9]+)\.([0-9]+)`)
 		matches := re.FindStringSubmatch(versionFull)
 		if len(matches) != 4 {
-			return "미점검", "Sendmail 버전 정보 파싱 실패", "Sendmail"
+			return "미점검", "Sendmail 버전 정보 파싱 실패", "Sendmail", "-"
 		}
 		major, _ := strconv.Atoi(matches[1])
 		minor, _ := strconv.Atoi(matches[2])
@@ -144,7 +150,7 @@ func performCheck(vulnid string) (string, string, string) {
 		if major > 8 || (major == 8 && minor >= 9) {
 			content, err := os.ReadFile(sendmailCfPath)
 			if err != nil {
-				return "미점검", "Sendmail 설정 파일 읽기 실패", "Sendmail"
+				return "미점검", "Sendmail 설정 파일 읽기 실패", "Sendmail", "-"
 			}
 			// promiscuous_relay가 명시적으로 활성화되어 있으면 취약
 			if strings.Contains(string(content), "promiscuous_relay") {
@@ -154,11 +160,11 @@ func performCheck(vulnid string) (string, string, string) {
 						continue
 					}
 					if strings.Contains(line, "promiscuous_relay") {
-						return "취약", "promiscuous_relay 옵션이 활성화되어 있음 → 취약", "Sendmail"
+						return "취약", "promiscuous_relay 옵션이 활성화되어 있음 → 취약", "Sendmail", "-"
 					}
 				}
 			}
-			return "양호", "sendmail 8.9 이상, promiscuous_relay 비활성화(디폴트) → 양호", "Sendmail"
+			return "양호", "sendmail 8.9 이상, promiscuous_relay 비활성화(디폴트) → 양호", "Sendmail", "-"
 		}
 
 		// 8.9 미만이면 접근통제 설정 파일 생성 여부 확인
@@ -175,18 +181,18 @@ func performCheck(vulnid string) (string, string, string) {
 			}
 		}
 		if found {
-			return "양호", "sendmail 8.9 미만, 접근통제 설정 파일 존재 → 양호", "Sendmail"
+			return "양호", "sendmail 8.9 미만, 접근통제 설정 파일 존재 → 양호", "Sendmail", "-"
 		} else {
-			return "취약", "sendmail 8.9 미만, 접근통제 설정 파일 없음 → 취약", "Sendmail"
+			return "취약", "sendmail 8.9 미만, 접근통제 설정 파일 없음 → 취약", "Sendmail", "-"
 		}
 	case "SRV-010":
 		sendmailCfPath := getSendmailCfPath()
 		if sendmailCfPath == "" {
-			return "미점검", "Sendmail 설정 파일을 찾을 수 없습니다.", "Sendmail"
+			return "미점검", "Sendmail 설정 파일을 찾을 수 없습니다.", "Sendmail", "-"
 		}
 		content, err := os.ReadFile(sendmailCfPath)
 		if err != nil {
-			return "미점검", "Sendmail 설정 파일 읽기 실패", "Sendmail"
+			return "미점검", "Sendmail 설정 파일 읽기 실패", "Sendmail", "-"
 		}
 		lines := strings.Split(string(content), "\n")
 		found := false
@@ -202,18 +208,18 @@ func performCheck(vulnid string) (string, string, string) {
 			}
 		}
 		if found {
-			return "양호", "PrivacyOptions에 restrictqrun 설정이 존재하여 일반 사용자의 queue 처리가 제한됩니다.", "Sendmail"
+			return "양호", "PrivacyOptions에 restrictqrun 설정이 존재하여 일반 사용자의 queue 처리가 제한됩니다.", "Sendmail", "-"
 		} else {
-			return "취약", "PrivacyOptions에 restrictqrun 설정이 없어 일반 사용자의 queue 처리가 제한되지 않습니다.", "Sendmail"
+			return "취약", "PrivacyOptions에 restrictqrun 설정이 없어 일반 사용자의 queue 처리가 제한되지 않습니다.", "Sendmail", "-"
 		}
 	case "SRV-170":
 		sendmailCfPath := getSendmailCfPath()
 		if sendmailCfPath == "" {
-			return "미점검", "Sendmail 설정 파일을 찾을 수 없습니다.", "Sendmail"
+			return "미점검", "Sendmail 설정 파일을 찾을 수 없습니다.", "Sendmail", "-"
 		}
 		content, err := os.ReadFile(sendmailCfPath)
 		if err != nil {
-			return "미점검", "Sendmail 설정 파일 읽기 실패", "Sendmail"
+			return "미점검", "Sendmail 설정 파일 읽기 실패", "Sendmail", "-"
 		}
 		lines := strings.Split(string(content), "\n")
 		for _, line := range lines {
@@ -225,16 +231,16 @@ func performCheck(vulnid string) (string, string, string) {
 			if strings.HasPrefix(line, "O SmtpGreetingMessage=") {
 				// $v 파라미터가 포함되어 있으면 취약
 				if strings.Contains(line, "$v") {
-					return "취약", "SmtpGreetingMessage에 $v 파라미터가 포함되어 있어 버전 정보가 노출됩니다.", "Sendmail"
+					return "취약", "SmtpGreetingMessage에 $v 파라미터가 포함되어 있어 버전 정보가 노출됩니다.", "Sendmail", "-"
 				} else {
-					return "양호", "SmtpGreetingMessage에 $v 파라미터가 없어 버전 정보가 노출되지 않습니다.", "Sendmail"
+					return "양호", "SmtpGreetingMessage에 $v 파라미터가 없어 버전 정보가 노출되지 않습니다.", "Sendmail", "-"
 				}
 			}
 		}
 		// SmtpGreetingMessage 설정이 없으면 양호로 간주
-		return "양호", "SmtpGreetingMessage 설정이 없어 버전 정보 노출 위험 없음.", "Sendmail"
+		return "양호", "SmtpGreetingMessage 설정이 없어 버전 정보 노출 위험 없음.", "Sendmail", "-"
 	default:
-		return "미점검", "❓ 알 수 없는 항목", "N/A"
+		return "미점검", "❓ 알 수 없는 항목", "N/A", "-"
 	}
 }
 
@@ -497,7 +503,7 @@ func checkSMTPExpnVrfy() (string, string, string) {
 	return status, strings.Join(detailParts, "\n"), service
 }
 
-func checkSMTP() (string, string, string) {
+func checkSMTP() (string, string, string, string) {
 	targets := []string{"sendmail", "exim", "opensmtpd", "qmail"}
 	seen := make(map[string]bool)
 	running := []string{}
@@ -542,7 +548,7 @@ func checkSMTP() (string, string, string) {
 	}
 
 	if len(running) == 0 && !port25Open {
-		return "양호", "SMTP 관련 프로세스가 실행되고 있지 않고 25번 포트도 열려있지 않음 → 양호", "미사용"
+		return "양호", "SMTP 관련 프로세스가 실행되고 있지 않고 25번 포트도 열려있지 않음 → 양호", "미사용", "-"
 	}
 
 	detail := ""
@@ -556,11 +562,15 @@ func checkSMTP() (string, string, string) {
 	}
 
 	serviceStatus := strings.Join(running, ",")
+	serviceon := "-"
+	if len(running) > 0 {
+		serviceon = running[0] // 첫 번째 감지된 서비스명을 사용
+	}
 	if port25Open && len(running) == 0 {
 		serviceStatus = "25포트만 오픈"
 	}
 
-	return "취약", detail, serviceStatus
+	return "취약", detail, serviceStatus, serviceon
 }
 
 func checkSNMP() (string, string, string) {

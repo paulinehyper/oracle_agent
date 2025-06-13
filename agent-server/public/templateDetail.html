@@ -66,7 +66,8 @@
           <th>취약점 ID</th>
           <th>취약점명</th>
           <th>위험도</th>
-          <th>설명</th>
+          <th>서비스</th>         <!-- 추가 -->
+          <th>설정 파일 경로</th> <!-- 추가 -->
           <th>점검</th>
           <th>결과</th>
           <th>상세</th>
@@ -74,13 +75,47 @@
       </thead>
       <tbody id="vulnTableBody"></tbody>
     </table>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
     <label for="assetSelect"><strong>점검할 자산 선택:</strong></label>
     <select id="assetSelect" required>
       <option value="">-- 자산을 선택하세요 --</option>
     </select>
     <div id="status"></div>
   </div>
-  <script>
+  <script> 
     let templateId = null;
     let templateName = '';
     async function loadTemplateDetail() {
@@ -145,7 +180,8 @@
             <td>${item.vul_id}</td>
             <td>${item.item_name}</td>
             <td>${item.risk_level || '-'}</td>
-            <td>${item.description || '-'}</td>
+            <td>${result.serviceon || '-'}</td>       <!-- 여기! -->
+            <td>${item.confpath || '-'}</td>
             <td>
               <button onclick="startCheck('${item.vul_id}')" class="check-btn" 
                       ${result.result === '점검 중' ? 'disabled' : ''}>

@@ -289,6 +289,7 @@ app.get('/api/template/by-id/:templateid', async (req, res) => {
          r.service_status,
          r.check_start_time,
          r.check_end_time,
+         r.serviceon,  -- serviceon 
          CASE WHEN r.result = '양호' THEN r.vuln_score ELSE 0 END AS vuln_last_score
        FROM evaluation_results r
        JOIN template_vuln t 
@@ -306,21 +307,22 @@ app.get('/api/template/by-id/:templateid', async (req, res) => {
   }
 });
 
-
 // 점검 결과 저장
 app.post('/api/result', async (req, res) => {
-  const { host_name, item_id, result, detail, service_status } = req.body;
+  const { host_name, item_id, result, detail, service_status, serviceon } = req.body;
+  console.log('점검 결과 저장 요청:', { host_name, item_id, result, serviceon }); // 로그 추가
   try {
     const updateResult = await pool.query(
       `UPDATE evaluation_results
        SET result = $1,
            detail = $2,
            service_status = $3,
+           serviceon = $4,                -- serviceon 저장
            checked_by_agent = true,
            last_checked_at = NOW(),
            check_end_time = NOW()
-       WHERE host_name = $4 AND item_id = $5`,
-      [result, detail, service_status, host_name, item_id]
+       WHERE host_name = $5 AND item_id = $6`,
+      [result, detail, service_status, serviceon, host_name, item_id]
     );
     if (updateResult.rowCount === 0) {
       console.warn(`⚠️ 업데이트 대상 없음: host=${host_name}, item_id=${item_id}`);
@@ -1004,10 +1006,8 @@ app.post('/api/check/results', async (req, res) => {
         `UPDATE evaluation_results 
          SET result = $1, 
              detail = $2,
-             checked_by_agent = true,
-             last_checked_at = NOW()
-         WHERE templateid = $3 AND item_id = $4`,
-        [result.status, result.detail, template_id, result.vul_id]
+             serviceon = $3 WHERE ...`,
+        [result.status, result.detail, result.serviceon, template_id, result.vul_id]
       );
     }
 
